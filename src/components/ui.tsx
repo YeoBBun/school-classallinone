@@ -1,5 +1,5 @@
 /** 여러 화면이 같이 쓰는 작은 부품: 복사 버튼, 인쇄, 학생 고르기, 화면 머리 */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Student } from '../domain/types';
 import { sortStudents } from './common';
@@ -111,4 +111,33 @@ export function PageHead({ title, children }: { title: string; children?: ReactN
 
 export function nameOf(students: Student[], id: string): string {
   return students.find((s) => s.id === id)?.name ?? '(삭제된 학생)';
+}
+
+/** [⋯] 메뉴: 자주 안 쓰는 것을 넣어 둔다. 바깥을 누르거나 고르면 닫힌다 */
+export function Menu({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  return (
+    <div className="menu" ref={ref}>
+      <button className="icon-btn" aria-label="더 보기" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="more" size={22} />
+      </button>
+      {open && (
+        <div className="menu-pop" role="menu" onClick={() => setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }

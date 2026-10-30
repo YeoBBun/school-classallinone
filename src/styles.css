@@ -586,3 +586,60 @@ a.record-main { text-decoration: none; color: inherit; }
   .seat { padding: 8px 2px; min-height: 50px; font-size: 13px; }
   .classroom { padding: 10px; }
 }
+
+/* ───────── 간소화 (2026-10): 색은 셋만 — 기본 회색, 챙길 것 빨강, 끝난 것 초록 ───────── */
+.k-approved, .k-ill, .k-etc, .n-obs, .n-counsel, .n-parent, .k-pilsa, .status-1, .status-2 { --k: var(--text-2); }
+.k-unexcused, .k-incident, .status-0, .warn-tag { --k: var(--danger); }
+.student-btn.has:not(.k-unexcused) { --k: var(--primary); }
+.sum-card .kpi-label { color: var(--muted); }
+.record.planned { border: 1.5px dashed color-mix(in srgb, var(--primary) 45%, transparent); }
+.seat.repeat { border-color: var(--danger); }
+.seat.front { box-shadow: none; }
+
+/* 머리글: 톱니바퀴, 구글 다시 연결 */
+.brand { flex: 1; }
+.settings-btn { margin-left: auto; position: relative; color: var(--text-2); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.settings-btn.on { color: var(--primary); background: var(--primary-soft); }
+.reconnect { white-space: nowrap; }
+
+/* 더보기: 타일 여섯 개 */
+.more-grid { list-style: none; padding: 0; margin: 0 auto; max-width: 640px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.more-tile {
+  display: grid; justify-items: center; gap: 10px; padding: 22px 8px; border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text); text-decoration: none; font-size: 15px;
+}
+.more-tile .icon { color: var(--primary); }
+.more-menu-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; max-width: 640px; }
+.sub-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.sub-head .back-link { margin-bottom: 0; }
+.seg-link { padding: 6px 14px; border-radius: 9px; color: var(--text-2); text-decoration: none; font-weight: 500; }
+.seg-link.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+.steps-plain { display: grid; gap: 8px; padding-left: 0; list-style: none; }
+
+/* 학생 페이지: [＋] · [⋯] · 요약 한 줄 */
+.student-page .page-head { gap: 6px; }
+.add-btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+.menu { position: relative; }
+.menu-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 200px;
+  display: grid; padding: 6px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-lg);
+}
+.menu-pop button { justify-content: flex-start; border: none; background: none; padding: 10px 12px; font-weight: 500; }
+.menu-pop button:hover { background: var(--surface-2); }
+.menu-pop button.on { color: var(--primary); }
+.summary-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.summary-line .chip { background: var(--surface); box-shadow: var(--shadow); }
+.summary-line .chip.warn { color: var(--danger); }
+.summary-line .chip.on { background: var(--primary); color: #fff; }
+.student-page input.wide { width: 100%; margin-bottom: 12px; }
+.choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.choice { flex-direction: column; gap: 8px; padding: 18px 8px; border-radius: var(--radius); background: var(--surface-2); border-color: transparent; font-weight: 600; }
+.choice .icon { color: var(--primary); }
+
+/* 필사 칸: 손가락으로 누르기 좋게 */
+@media (max-width: 640px) {
+  .more-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .reconnect { padding: 4px 8px; font-size: 12px; }
+}
+.todo-list li { display: flex; align-items: center; gap: 8px; }
+.todo-list li > .row-btn, .todo-list li > .follow-up { flex: 1; }

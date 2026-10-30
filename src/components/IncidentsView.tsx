@@ -67,7 +67,7 @@ export function IncidentsView() {
 }
 
 export function IncidentForm({ initial, studentId, onClose }: { initial?: Incident; studentId?: string; onClose: () => void }) {
-  const { state, update } = useStore();
+  const { state, update, removeItem } = useStore();
   const isNew = !initial;
   const [draft, setDraft] = useState<Incident>(
     () =>
@@ -94,8 +94,7 @@ export function IncidentForm({ initial, studentId, onClose }: { initial?: Incide
     onClose();
   };
   const remove = () => {
-    if (!confirm('이 사안 기록을 지울까요? 되돌릴 수 없어요.')) return;
-    update((s) => ({ ...s, incidents: s.incidents.filter((i) => i.id !== draft.id) }));
+    removeItem('incidents', draft.id, `사안 '${draft.title || '제목 없음'}'`);
     onClose();
   };
 

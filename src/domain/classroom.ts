@@ -76,6 +76,33 @@ export function neisBytes(text: string): number {
   return n;
 }
 
+// ─── 새 학년도 ───
+
+/**
+ * 새 학년도: 학생 명단과 학생에 대한 기록을 모두 비우고, 규정·휴일·캘린더 설정은 남긴다.
+ * (캘린더에 넣은 지난 상담 일정은 지우지 않고 남겨 둔다 — 연결 기록만 비운다)
+ */
+export function newSchoolYear(s: AppState): AppState {
+  return {
+    ...s,
+    students: [],
+    records: [],
+    notes: [],
+    checklists: [],
+    pilsa: [],
+    incidents: [],
+    seatPlans: [],
+    behavior: [],
+    calendarLinks: [],
+    settings: {
+      ...s.settings,
+      className: '',
+      lastNeisExportTo: undefined,
+      seating: { ...s.settings.seating, front: [], apart: [] },
+    },
+  };
+}
+
 // ─── 오늘 챙길 일 ───
 
 export interface TodoSummary {

@@ -139,7 +139,7 @@ export function SeatingView() {
           previousPairs={previous && rules.pair ? partnerPairs(previous.seats, previous.cols) : null}
         />
       </div>
-      <p className="hint">두 자리를 차례로 누르면 서로 바뀌어요. 앞쪽 {FRONT_ROWS}줄이 «앞자리»예요.</p>
+      {picked !== null && <p className="info">바꿀 자리를 누르세요.</p>}
 
       {unseated.length > 0 && (
         <section className="card">
@@ -151,7 +151,6 @@ export function SeatingView() {
               </button>
             ))}
           </div>
-          <p className="hint">누르면 고른 빈자리(없으면 첫 빈자리)에 앉혀요.</p>
         </section>
       )}
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { desiredEvents, eventHash, planCalendar } from './calendarEvents';
-import { checklistProgress, missingText, neisBytes, pilsaSummary, submitPage, suggestedPages, todoSummary, undoPage } from './classroom';
+import { checklistProgress, missingText, neisBytes, newSchoolYear, pilsaSummary, submitPage, suggestedPages, todoSummary, undoPage } from './classroom';
 import { adjacent, partnerPairs, penalty, shuffleSeats, viewRows } from './seating';
 import { removeStudentData, remapStudents } from './student';
 import { emptyState, type AppState, type Checklist, type PilsaTask, type SeatingRules } from './types';
@@ -77,6 +77,7 @@ describe('캘린더 일정', () => {
       notes: [
         { id: 'n1', studentIds: ['s2'], kind: '학부모상담', date: '2026-11-03', time: '15:30', content: '', planned: true, parentWho: '어머니', parentMethod: '대면' },
         { id: 'n2', studentIds: ['s1'], kind: '학부모상담', date: '2026-10-01', content: '진로', planned: false },
+        { id: 'n3', studentIds: ['s3'], kind: '학부모상담', date: '2026-10-02', time: '16:00', content: '마침' },
       ],
       checklists: [{ id: 'c1', title: '동의서', createdAt: '2026-10-01', dueDate: '2026-11-05', marks: {} }],
     };
@@ -84,10 +85,12 @@ describe('캘린더 일정', () => {
     expect(desired.map((d) => [d.key, d.summary, d.time])).toEqual([
       ['due:c1', '제출 마감: 동의서', undefined],
       ['note:n1', '학부모 상담: 2번 학생2 (어머니 · 대면)', '15:30'],
+      ['note:n3', '학부모 상담: 3번 학생3', '16:00'], // 마친 상담도 남는다
     ]);
     const links = [
       { id: 'due:c1', eventId: 'e1', hash: eventHash(desired[0]) },
       { id: 'note:n1', eventId: 'e2', hash: 'old' },
+      { id: 'note:n3', eventId: 'e4', hash: eventHash(desired[2]) },
       { id: 'note:gone', eventId: 'e3', hash: 'x' },
     ];
     const plan = planCalendar(desired, links);
@@ -116,6 +119,20 @@ describe('오늘 챙길 일', () => {
     expect(t.followUps.map((n) => n.id)).toEqual(['c']);
     expect(t.checklists).toEqual([{ checklist: s.checklists[0], missing: 3 }]);
     expect([t.openIncidents, t.pilsaStudents, t.pilsaPages]).toEqual([1, 1, 2]);
+  });
+});
+
+describe('새 학년도', () => {
+  it('명단과 기록은 비우고 규정·휴일은 남긴다', () => {
+    const s: AppState = {
+      ...base(),
+      holidays: [{ date: '2027-03-01', name: '삼일절', type: '공휴일' }],
+      notes: [{ id: 'n', studentIds: ['s1'], kind: '관찰', date: '2026-10-01', content: 'x' }],
+      settings: { ...base().settings, className: '2-3', pilsaBase: 2, calendarOn: true, calendarId: 'cal' },
+    };
+    const n = newSchoolYear(s);
+    expect([n.students.length, n.notes.length, n.settings.className]).toEqual([0, 0, '']);
+    expect([n.holidays.length, n.settings.pilsaBase, n.settings.calendarId]).toEqual([1, 2, 'cal']);
   });
 });
 

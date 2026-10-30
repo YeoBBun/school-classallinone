@@ -13,7 +13,8 @@ const PLACEHOLDER: Record<NoteKind, string> = {
 
 /**
  * 관찰·상담 기록 쓰기. 꼭 필요한 칸(유형·내용)만 보이고, 나머지는 «더 적기» 안에 있다.
- * 학부모상담은 «상담 일정 잡기» 로 앞으로 할 상담을 넣을 수 있다 (구글 캘린더에도 들어간다).
+ * 유형은 연 곳(학생 페이지의 [＋])에서 이미 골랐으므로 새 기록에는 유형 고르기가 없다 (고칠 때만 바꿀 수 있다).
+ * 상담 일정은 따로 연다 (planned). 일정을 다시 열면 [상담했어요 — 결과 적기] 하나로 끝난 상담이 된다.
  */
 export function NoteForm({
   initial,
@@ -70,34 +71,31 @@ export function NoteForm({
     onClose();
   };
 
-  const title = planned ? '상담 일정' : isNew ? '기록 남기기' : '기록 고치기';
+  const title = planned ? '상담 일정' : `${draft.kind} ${isNew ? '남기기' : '고치기'}`;
 
   return (
     <Modal title={`${student ? `${student.number}. ${student.name}` : ''} ${title}`} onClose={onClose}>
       <div className="form">
-        <section>
-          <div className="big-seg">
-            {NOTE_KINDS.map((k) => (
-              <button key={k} type="button" className={draft.kind === k ? 'on' : ''} onClick={() => set({ kind: k })}>
-                {k}
-              </button>
-            ))}
-          </div>
-        </section>
+        {!isNew && !planned && (
+          <section>
+            <div className="seg">
+              {NOTE_KINDS.map((k) => (
+                <button key={k} type="button" className={draft.kind === k ? 'on' : ''} onClick={() => set({ kind: k })}>
+                  {k}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {planned && !isNew && (
+          <button type="button" className="primary big" onClick={() => set({ planned: false, date: draft.date > today() ? today() : draft.date })}>
+            상담했어요 — 결과 적기
+          </button>
+        )}
 
         {parent && (
           <>
-            <section>
-              <div className="seg">
-                <button type="button" className={!planned ? 'on' : ''} onClick={() => set({ planned: false })}>
-                  한 상담 적기
-                </button>
-                <button type="button" className={planned ? 'on' : ''} onClick={() => set({ planned: true, time: draft.time ?? '15:00' })}>
-                  상담 일정 잡기
-                </button>
-              </div>
-              {initial?.planned && !planned && <p className="hint">상담을 마쳤으면 아래에 내용을 적고 저장하세요.</p>}
-            </section>
             <section className="row">
               {planned && (
                 <>

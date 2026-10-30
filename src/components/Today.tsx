@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { addDays, formatKo, isWeekend, today } from '../domain/calendar';
-import { pendingDocs, shortTitle, studentName, type PendingRow } from '../domain/pending';
-import { computeWarnings, statusOn, DOC_FT_REPORT, rebuildDocs } from '../domain/rules';
+import { computeWarnings, statusOn, rebuildDocs } from '../domain/rules';
 import {
   APPROVED_REASONS,
   KINDS,
@@ -15,9 +14,7 @@ import {
 } from '../domain/types';
 import { newId, useStore } from '../store';
 import { dayStatus, kindClass, KIND_SHORT, KindGuide, Modal, PeriodPicker, recordDates, sortStudents, studentLabel } from './common';
-import { FieldTripIntake } from './FieldTripIntake';
 import { Icon } from './icons';
-import { NeisExport } from './NeisExport';
 import { clean, RecordForm } from './RecordForm';
 import { RecordItem } from './RecordItem';
 import { TodoCard } from './TodoCard';
@@ -42,8 +39,6 @@ export function Today() {
   const { state, holidays } = useStore();
   const [date, setDate] = useState(today);
   const [entryFor, setEntryFor] = useState<string | null>(null);
-  const [intake, setIntake] = useState(false);
-  const [neis, setNeis] = useState(false);
   const now = today();
   const holiday = holidays.get(date);
   const { main, weekday } = bigDate(date);
@@ -89,7 +84,7 @@ export function Today() {
       {state.students.length === 0 ? (
         <div className="empty">
           <p>학생 명단이 아직 없어요.</p>
-          <a className="button primary" href="#settings">
+          <a className="button primary" href="#settings/class">
             설정에서 명단 등록하기
           </a>
         </div>
@@ -106,23 +101,10 @@ export function Today() {
           <aside className="today-side">
             <DaySummary date={date} records={todays} onOpen={setEntryFor} />
             <TodoCard />
-            <div className="quick-actions">
-              <button className="tile-btn" onClick={() => setIntake(true)}>
-                <Icon name="plane" size={20} />
-                체험학습 접수
-              </button>
-              <button className="tile-btn" onClick={() => setNeis(true)}>
-                <Icon name="upload" size={20} />
-                나이스 파일
-              </button>
-            </div>
-            <PendingDocs />
           </aside>
         </div>
       )}
 
-      {intake && <FieldTripIntake onClose={() => setIntake(false)} />}
-      {neis && <NeisExport onClose={() => setNeis(false)} />}
       {entryFor && <QuickEntry studentId={entryFor} date={date} onClose={() => setEntryFor(null)} />}
     </div>
   );
@@ -483,58 +465,3 @@ function Choice<T extends string>({
 }
 
 /** 아직 받지 않은 필수 서류. 기한 지난 것을 위로. */
-function PendingDocs() {
-  const { state, update, holidays } = useStore();
-  const [editing, setEditing] = useState<AttendanceRecord | null>(null);
-  const now = today();
-
-  const rows = useMemo(() => {
-    const overdue = (r: PendingRow) => (r.deadline && r.deadline < now ? 0 : 1);
-    return pendingDocs(state, holidays).sort((a, b) => overdue(a) - overdue(b));
-  }, [state, holidays, now]);
-
-  const receive = (recordId: string, key: string) =>
-    update((s) => ({
-      ...s,
-      records: s.records.map((r) =>
-        r.id === recordId ? { ...r, docs: r.docs.map((d) => (d.key === key ? { ...d, received: true, receivedDate: now } : d)) } : r,
-      ),
-    }));
-
-  return (
-    <section className="card">
-      <div className="card-head">
-        <h3>받아야 할 서류</h3>
-        {rows.length > 0 && <span className="count-badge">{rows.length}</span>}
-      </div>
-      {rows.length === 0 ? (
-        <p className="all-present">
-          <Icon name="check" size={16} /> 모두 받았어요
-        </p>
-      ) : (
-        <ul className="pending">
-          {rows.map(({ record, doc, deadline }) => (
-            <li key={record.id + doc.key} className={deadline && deadline < now ? 'over' : ''}>
-              <button className="link who" onClick={() => setEditing(record)}>
-                {studentName(state, record.studentId)}
-              </button>
-              <span className="what">
-                <b>{doc.label}</b>
-                <span className="muted">
-                  {' '}
-                  · {formatKo(record.startDate)} {shortTitle(record)}
-                  {doc.key === DOC_FT_REPORT && now <= record.endDate && ' · 다녀온 후'}
-                  {deadline && ` · 기한 ${formatKo(deadline)}`}
-                </span>
-              </span>
-              <button className="primary small" onClick={() => receive(record.id, doc.key)}>
-                받음
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {editing && <RecordForm initial={editing} onClose={() => setEditing(null)} />}
-    </section>
-  );
-}

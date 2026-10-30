@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { indexHolidays, today, type HolidayIndex } from './domain/calendar';
 import { computeWarnings, type DocContext } from './domain/rules';
-import type { AppState, AttendanceRecord, Note } from './domain/types';
+import type { AppState } from './domain/types';
 import { androidApp } from './platform/android';
 import { loadState, requestPersistence, saveState } from './storage/db';
 import { widgetSummary } from './domain/pending';
@@ -21,6 +21,8 @@ interface Store {
   saveError: string | null;
   /** 기록을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다. label 은 안내에 쓰는 설명 */
   removeRecord: (id: string, label: string) => void;
+  /** 어느 목록에서든 항목을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다 */
+  removeItem: (field: UndoField, id: string, label: string) => void;
   /** 관찰·상담 기록을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다 */
   removeNote: (id: string, label: string) => void;
   /** 휴대폰 ↔ PC 동기화 상태 */
@@ -44,7 +46,15 @@ export type SyncStatus =
 const SYNC_DEBOUNCE_MS = 4000;
 const SYNC_INTERVAL_MS = 60_000;
 
-type Undo = { label: string; index: number } & ({ record: AttendanceRecord } | { note: Note });
+/** 지우고 되돌릴 수 있는 목록 */
+export type UndoField = 'records' | 'notes' | 'checklists' | 'pilsa' | 'incidents' | 'seatPlans';
+
+interface Undo {
+  field: UndoField;
+  item: { id: string };
+  index: number;
+  label: string;
+}
 
 const UNDO_MS = 8000;
 
@@ -67,43 +77,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLocalEdits((n) => n + 1);
   }, []);
 
-  const removeRecord = useCallback(
-    (id: string, label: string) => {
+  const removeItem = useCallback(
+    (field: UndoField, id: string, label: string) => {
       const s = stateRef.current;
-      const index = s?.records.findIndex((r) => r.id === id) ?? -1;
+      const list = (s?.[field] ?? []) as { id: string }[];
+      const index = list.findIndex((x) => x.id === id);
       if (!s || index < 0) return;
-      commit((cur) => ({ ...cur, records: cur.records.filter((r) => r.id !== id) }));
-      setUndo({ record: s.records[index], index, label });
+      commit((cur) => ({ ...cur, [field]: (cur[field] as { id: string }[]).filter((x) => x.id !== id) }));
+      setUndo({ field, item: list[index], index, label });
     },
     [commit],
   );
-
-  const removeNote = useCallback(
-    (id: string, label: string) => {
-      const s = stateRef.current;
-      const index = s?.notes.findIndex((n) => n.id === id) ?? -1;
-      if (!s || index < 0) return;
-      commit((cur) => ({ ...cur, notes: cur.notes.filter((n) => n.id !== id) }));
-      setUndo({ note: s.notes[index], index, label });
-    },
-    [commit],
-  );
+  const removeRecord = useCallback((id: string, label: string) => removeItem('records', id, label), [removeItem]);
+  const removeNote = useCallback((id: string, label: string) => removeItem('notes', id, label), [removeItem]);
 
   const restore = () => {
     if (!undo) return;
-    if ('record' in undo) {
-      commit((s) =>
-        !s.records.some((r) => r.id === undo.record.id)
-          ? { ...s, records: [...s.records.slice(0, undo.index), undo.record, ...s.records.slice(undo.index)] }
-          : s,
-      );
-    } else {
-      commit((s) =>
-        !s.notes.some((n) => n.id === undo.note.id)
-          ? { ...s, notes: [...s.notes.slice(0, undo.index), undo.note, ...s.notes.slice(undo.index)] }
-          : s,
-      );
-    }
+    const { field, item, index } = undo;
+    commit((s) => {
+      const list = s[field] as { id: string }[];
+      return list.some((x) => x.id === item.id) ? s : { ...s, [field]: [...list.slice(0, index), item, ...list.slice(index)] };
+    });
     setUndo(null);
   };
 
@@ -249,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   if (!state) return <div className="fatal">불러오는 중…</div>;
 
   return (
-    <StoreContext.Provider value={{ state, update, replace, holidays, docContext, warnings, saveError, removeRecord, removeNote, sync, syncNow: () => void runSync(), widgetSync, calendar }}>
+    <StoreContext.Provider value={{ state, update, replace, holidays, docContext, warnings, saveError, removeRecord, removeNote, removeItem, sync, syncNow: () => void runSync(), widgetSync, calendar }}>
       {children}
       {undo && (
         <div className="toast" role="status">

@@ -47,9 +47,6 @@ export function NuggaView() {
           </button>
         )}
       </PageHead>
-      <p className="hint">
-        관찰·상담 기록 중 나이스 누가기록에 옮길 것이에요. [복사]를 눌러 나이스에 붙여 넣고, 다 넣었으면 [넣음]에 체크하세요.
-      </p>
       <div className="toolbar">
         <div className="seg">
           <button className={show === 'todo' ? 'on' : ''} onClick={() => setShow('todo')}>
@@ -63,7 +60,7 @@ export function NuggaView() {
       </div>
 
       {groups.length === 0 ? (
-        <p className="empty">{show === 'todo' ? '옮길 기록이 없어요.' : '아직 넣었다고 표시한 기록이 없어요.'}</p>
+        <p className="empty">{show === 'todo' ? '나이스에 옮길 관찰·상담 기록이 없어요.' : '아직 넣었다고 표시한 기록이 없어요.'}</p>
       ) : (
         <ul className="cards">
           {groups.map((g) => (

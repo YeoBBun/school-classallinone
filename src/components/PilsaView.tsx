@@ -32,10 +32,9 @@ export function PilsaView() {
           <Icon name="plus" /> 필사 부여
         </button>
       </PageHead>
-      <p className="hint">칸 하나가 한 장이에요. 빈 칸을 누르면 낸 것, 채운 칸을 누르면 취소예요.</p>
 
       {rows.length === 0 ? (
-        <p className="empty">이번 학년도에 부여한 필사가 없어요.</p>
+        <p className="empty">부여한 필사가 없어요. 칸 하나가 한 장이고, 누르면 낸 것으로 표시돼요.</p>
       ) : (
         <ul className="cards">
           {rows.map((r) => (
@@ -72,9 +71,9 @@ export function PilsaView() {
 }
 
 function PilsaTaskRow({ task }: { task: PilsaTask }) {
-  const { update } = useStore();
+  const { update, removeItem } = useStore();
   const set = (fn: (t: PilsaTask) => PilsaTask) => update((s) => ({ ...s, pilsa: s.pilsa.map((p) => (p.id === task.id ? fn(p) : p)) }));
-  const remove = () => confirm('이 부여 기록을 지울까요?') && update((s) => ({ ...s, pilsa: s.pilsa.filter((p) => p.id !== task.id) }));
+  const remove = () => removeItem('pilsa', task.id, `${formatKo(task.date)} 필사 ${task.pages}장`);
   return (
     <li>
       <span className="muted small pilsa-when">
@@ -102,7 +101,7 @@ function PilsaTaskRow({ task }: { task: PilsaTask }) {
   );
 }
 
-function GiveForm({ studentId, onClose }: { studentId: string | null; onClose: () => void }) {
+export function GiveForm({ studentId, onClose }: { studentId: string | null; onClose: () => void }) {
   const { state, update } = useStore();
   const [who, setWho] = useState<string | null>(studentId);
   const [reason, setReason] = useState('');

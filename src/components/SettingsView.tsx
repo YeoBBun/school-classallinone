@@ -5,6 +5,9 @@ import { formatKo, indexHolidays } from '../domain/calendar';
 import { rebuildDocs } from '../domain/rules';
 import { mergePublicHolidays } from '../domain/publicHolidays';
 import { removeStudentData, studentDataCount } from '../domain/student';
+import { newSchoolYear } from '../domain/classroom';
+import { useGoogle } from '../google/useGoogle';
+import { Icon, type IconName } from './icons';
 import type { DeadlineBasis, HolidayType, Settings, Student } from '../domain/types';
 import { emptyState } from '../domain/types';
 import { exportBackup, normalize } from '../storage/db';
@@ -28,21 +31,118 @@ export function parseRoster(text: string, startNumber: number): { number: number
     });
 }
 
-export function SettingsView() {
-  // 백업할 때가 됐으면 백업 칸을 맨 위로 올린다.
+const SECTIONS = [
+  { id: 'class', label: '학급 · 학생 명단', icon: 'people' },
+  { id: 'google', label: '구글 연결', icon: 'grid' },
+  { id: 'rules', label: '출결 규정', icon: 'list' },
+  { id: 'backup', label: '백업 · 새 학년도', icon: 'doc' },
+] as const satisfies readonly { id: string; label: string; icon: IconName }[];
+
+/** 설정: 목록 → 누르면 그 묶음만 (#settings/묶음) */
+export function SettingsView({ section }: { section: string | null }) {
+  const { state } = useStore();
   const needBackup = useNeedBackup();
+  const g = useGoogle();
+  const open = SECTIONS.find((s) => s.id === section);
+
+  if (!open) {
+    const desc: Record<(typeof SECTIONS)[number]['id'], string> = {
+      class: `${state.settings.className || '학급 이름 없음'} · 학생 ${state.students.length}명`,
+      google: g.connected ? `${g.email || '연결됨'}` : g.expired ? '연결이 끝났어요' : '연결 안 됨',
+      rules: '휴일, 시험 기간, 체험학습 규정',
+      backup: state.settings.lastBackupAt ? `마지막 백업 ${new Date(state.settings.lastBackupAt).toLocaleDateString('ko-KR')}` : '아직 백업 안 함',
+    };
+    return (
+      <div className="module">
+        <h2 className="page-title">설정</h2>
+        <ul className="more-menu-list">
+          {SECTIONS.map((s) => (
+            <li key={s.id}>
+              <a href={`#settings/${s.id}`} className="more-item">
+                <Icon name={s.icon} size={22} />
+                <span>
+                  <b>{s.label}</b>
+                  <span className="muted">{desc[s.id]}</span>
+                </span>
+                {s.id === 'backup' && needBackup && <span className="count-badge">백업</span>}
+                {s.id === 'google' && g.expired && <span className="count-badge">!</span>}
+                <Icon name="right" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
     <div className="settings">
-      {needBackup && <BackupSettings />}
-      <ClassSettings />
-      <RosterSettings />
-      <GoogleSettings />
-      <HolidaySettings />
-      <ExamSettings />
-      <RuleSettings />
-      <SyncSettings />
-      {!needBackup && <BackupSettings />}
+      <a href="#settings" className="button ghost back-link">
+        <Icon name="left" /> 설정
+      </a>
+      {open.id === 'class' && (
+        <>
+          <ClassSettings />
+          <RosterSettings />
+        </>
+      )}
+      {open.id === 'google' && (
+        <>
+          <GoogleSettings />
+          <SyncSettings />
+        </>
+      )}
+      {open.id === 'rules' && (
+        <>
+          <HolidaySettings />
+          <ExamSettings />
+          <RuleSettings />
+        </>
+      )}
+      {open.id === 'backup' && (
+        <>
+          <BackupSettings />
+          <NewYearSettings />
+        </>
+      )}
     </div>
+  );
+}
+
+/** 새 학년도: 백업을 먼저 받게 하고, 그다음에만 비운다 */
+function NewYearSettings() {
+  const { state, replace, update } = useStore();
+  const [saved, setSaved] = useState(false);
+  const backup = () => {
+    const at = new Date().toISOString();
+    exportBackup({ ...state, settings: { ...state.settings, lastBackupAt: at } });
+    update((s) => ({ ...s, settings: { ...s.settings, lastBackupAt: at } }));
+    setSaved(true);
+  };
+  const start = () => {
+    if (!confirm('학생 명단과 모든 기록을 비우고 새 학년도로 시작할까요? (백업 파일로 언제든 되살릴 수 있어요)')) return;
+    replace(newSchoolYear(state));
+    location.hash = '#settings/class';
+  };
+  return (
+    <section className="card">
+      <h3>새 학년도 시작</h3>
+      <p className="hint">
+        지난 학년도 기록을 파일로 저장한 뒤, 학생 명단과 모든 기록을 비워요. 출결 규정·휴일·구글 연결은 그대로 남아요. 다른 기기도 함께 비워져요.
+      </p>
+      <ol className="steps-plain">
+        <li>
+          <button className={saved ? '' : 'primary'} onClick={backup}>
+            {saved ? '✓ 저장했어요' : '① 지난 학년도 백업 저장'}
+          </button>
+        </li>
+        <li>
+          <button className={saved ? 'primary' : ''} disabled={!saved} onClick={start}>
+            ② 새 학년도로 시작
+          </button>
+        </li>
+      </ol>
+    </section>
   );
 }
 
@@ -353,8 +453,8 @@ function BackupSettings() {
         </p>
       )}
       <p className="hint">
-        데이터는 이 컴퓨터의 이 브라우저 안에만 저장되고 외부로 전송되지 않습니다. 브라우저 데이터를 지우거나 다른 컴퓨터에서 쓰려면 백업
-        파일이 필요합니다. 정기적으로 백업하세요.
+        데이터는 이 브라우저 안에 저장돼요 (다른 기기와 맞추기를 켜면 잠가서 내 드라이브에도). 브라우저 데이터를 지우기 전이나 다른
+        컴퓨터로 옮길 때를 위해 정기적으로 백업하세요.
         {state.settings.lastBackupAt && ` 마지막 백업: ${new Date(state.settings.lastBackupAt).toLocaleString('ko-KR')}`}
       </p>
       <div className="inline">

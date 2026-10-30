@@ -103,7 +103,7 @@ function ChecklistCard({ checklist: c, onOpen }: { checklist: Checklist; onOpen:
 }
 
 function ChecklistDetail({ id, onClose }: { id: string; onClose: () => void }) {
-  const { state, update } = useStore();
+  const { state, update, removeItem } = useStore();
   const c = state.checklists.find((x) => x.id === id);
   const [mode, setMode] = useState<'done' | 'exempt'>('done');
   if (!c) return null;
@@ -120,8 +120,7 @@ function ChecklistDetail({ id, onClose }: { id: string; onClose: () => void }) {
     set({ marks: next });
   };
   const remove = () => {
-    if (!confirm(`'${c.title}' 항목을 지울까요?`)) return;
-    update((s) => ({ ...s, checklists: s.checklists.filter((x) => x.id !== id) }));
+    removeItem('checklists', id, c.title);
     onClose();
   };
   const rows = () => [

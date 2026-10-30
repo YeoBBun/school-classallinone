@@ -24,7 +24,8 @@ export function desiredEvents(s: AppState): DesiredEvent[] {
   };
   const out: DesiredEvent[] = [];
   for (const n of s.notes) {
-    if (!n.planned || n.kind !== '학부모상담') continue;
+    // 일정으로 잡았던 상담(시각이 있다)은 상담을 마친 뒤에도 캘린더에 남긴다
+    if (n.kind !== '학부모상담' || (!n.planned && !n.time)) continue;
     const who = n.studentIds.map(name).filter(Boolean).join(', ');
     const how = [n.parentWho, n.parentMethod].filter(Boolean).join(' · ');
     out.push({
