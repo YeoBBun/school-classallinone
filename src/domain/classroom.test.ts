@@ -80,17 +80,20 @@ describe('캘린더 일정', () => {
         { id: 'n3', studentIds: ['s3'], kind: '학부모상담', date: '2026-10-02', time: '16:00', content: '마침' },
       ],
       checklists: [{ id: 'c1', title: '동의서', createdAt: '2026-10-01', dueDate: '2026-11-05', marks: {} }],
+      events: [{ id: 'v1', kind: '학급 행사', title: '체육대회', date: '2026-11-10', time: '09:00' }],
     };
     const desired = desiredEvents(s);
     expect(desired.map((d) => [d.key, d.summary, d.time])).toEqual([
       ['due:c1', '제출 마감: 동의서', undefined],
+      ['event:v1', '체육대회', '09:00'],
       ['note:n1', '학부모 상담: 2번 학생2 (어머니 · 대면)', '15:30'],
       ['note:n3', '학부모 상담: 3번 학생3', '16:00'], // 마친 상담도 남는다
     ]);
     const links = [
       { id: 'due:c1', eventId: 'e1', hash: eventHash(desired[0]) },
       { id: 'note:n1', eventId: 'e2', hash: 'old' },
-      { id: 'note:n3', eventId: 'e4', hash: eventHash(desired[2]) },
+      { id: 'event:v1', eventId: 'e5', hash: eventHash(desired[1]) },
+      { id: 'note:n3', eventId: 'e4', hash: eventHash(desired[3]) },
       { id: 'note:gone', eventId: 'e3', hash: 'x' },
     ];
     const plan = planCalendar(desired, links);
@@ -111,8 +114,14 @@ describe('오늘 챙길 일', () => {
       ],
       checklists: [{ id: 'k', title: '회신', createdAt: '2026-10-01', marks: { s1: '2026-10-02' } }],
       pilsa: [{ id: 'p', studentId: 's2', date: '2026-10-01', reason: '', pages: 3, submitted: ['2026-10-02'] }],
+      events: [
+        { id: 'e1', kind: '학급 행사', title: '체육대회', date: '2026-11-05' },
+        { id: 'e2', kind: '기타', title: '지난 일', date: '2026-10-01' },
+        { id: 'e3', kind: '기타', title: '먼 일', date: '2026-12-25' },
+      ],
     };
     const t = todoSummary(s, '2026-10-30');
+    expect(t.events.map((e) => e.id)).toEqual(['e1']);
     expect(t.upcoming.map((n) => n.id)).toEqual(['b']);
     expect(t.unwritten.map((n) => n.id)).toEqual(['a']);
     expect(t.followUps.map((n) => n.id)).toEqual(['c']);

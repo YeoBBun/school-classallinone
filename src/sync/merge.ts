@@ -19,6 +19,7 @@ const COLLECTIONS = [
   { field: 'checklists', prefix: 'c:' },
   { field: 'pilsa', prefix: 'p:' },
   { field: 'seatPlans', prefix: 'sp:' },
+  { field: 'events', prefix: 'e:' },
   { field: 'behavior', prefix: 'b:' },
   { field: 'calendarLinks', prefix: 'cl:' },
   { field: 'holidays', prefix: 'h:' },

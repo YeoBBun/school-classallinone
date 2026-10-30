@@ -338,7 +338,7 @@ details summary { cursor: pointer; color: var(--text-2); font-weight: 600; }
   .top h1 { font-size: 17px; }
   nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-radius: 0; box-shadow: 0 -1px 0 var(--line);
   }
@@ -638,3 +638,71 @@ a.record-main { text-decoration: none; color: inherit; }
 .choice-grid.two { grid-template-columns: 1fr 1fr; }
 .choice-grid.two .choice { padding: 28px 8px; font-size: 17px; }
 a.choice { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); }
+
+/* ───────── 메뉴: 오늘 / 더보기(작은 창) / 설정 ───────── */
+nav .nav-btn {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 10px; border: none; background: none;
+  color: var(--text-2); font-weight: 600; font-size: inherit;
+}
+nav .nav-btn:hover { background: var(--surface-2); }
+nav .nav-btn.on { background: var(--primary-soft); color: var(--primary); }
+.more-backdrop { position: fixed; inset: 0; z-index: 25; background: rgba(0, 0, 0, 0.12); }
+.more-pop {
+  position: absolute; top: 72px; right: max(16px, calc((100vw - 1180px) / 2));
+  width: min(420px, calc(100vw - 32px)); padding: 14px; border-radius: var(--radius);
+  background: var(--bg); box-shadow: var(--shadow-lg);
+}
+.more-pop .more-grid { max-width: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.more-pop .more-tile { padding: 18px 6px; }
+.more-tile.on { outline: 2px solid var(--primary); }
+
+@media (max-width: 640px) {
+  nav { grid-template-columns: repeat(3, 1fr) !important; }
+  nav .nav-btn { flex-direction: column; gap: 2px; padding: 6px 0; font-size: 12px; justify-content: center; }
+  nav .nav-btn.on { background: transparent; }
+  /* 휴대폰: 아래 메뉴 바로 위에서 올라오는 판 */
+  .more-pop {
+    top: auto; right: 0; left: 0; bottom: calc(60px + env(safe-area-inset-bottom)); width: auto;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .more-pop .more-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* 일정 */
+.day-group h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.schedule-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+.schedule-list .row-btn { display: flex; gap: 14px; align-items: baseline; width: 100%; text-align: left; justify-content: flex-start; border: none; background: none; padding: 8px 6px; font-weight: 400; }
+.schedule-list .row-btn:hover { background: var(--surface-2); }
+.schedule-list .time { min-width: 48px; color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* 오늘: 출결 카드 머리의 체험학습 접수 */
+.card-head .trip-btn { margin-left: 4px; }
+
+/* ───────── 학생 기록: 종류별 칸 ───────── */
+.student-page.profile { display: grid; gap: 12px; max-width: 860px; margin: 0 auto; }
+.student-page.profile .page-head { margin-bottom: 0; }
+.rec-section { padding: 16px 18px; }
+.rec-section .card-head { margin-bottom: 8px; }
+.rec-section .card-head h3 { font-size: 15px; }
+.stat-line { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; color: var(--text-2); margin-bottom: 6px; }
+.stat-line b { color: var(--text); font-size: 18px; margin-left: 2px; }
+.rec-rows { list-style: none; padding: 0; margin: 0; }
+.rec-rows li + li { border-top: 1px solid var(--line); }
+.rec-row {
+  display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 12px; align-items: baseline;
+  width: 100%; padding: 10px 2px; text-align: left; border: none; border-radius: 0; background: none;
+  font-weight: 400; color: var(--text); text-decoration: none; justify-content: stretch; cursor: pointer;
+}
+.rec-row:hover:not(:disabled) { background: var(--surface-2); }
+.rec-row .when { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+.rec-row .body { display: grid; gap: 2px; }
+.rec-row .kind { font-size: 13px; color: var(--muted); font-weight: 600; }
+.rec-row .text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.rec-row.check-row { cursor: default; }
+a.rec-row .body, button.rec-row .body { display: block; }
+.rec-row .kind + .text, .rec-row .text + .small { display: block; }
+@media (max-width: 640px) {
+  .rec-row { grid-template-columns: 1fr; gap: 2px; }
+  .rec-section { padding: 14px; }
+}

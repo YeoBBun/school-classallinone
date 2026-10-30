@@ -153,6 +153,20 @@ export interface PilsaTask extends Stamped {
   submitted: DateStr[];
 }
 
+export const EVENT_KINDS = ['학급 행사', '기타'] as const;
+export type EventKind = (typeof EVENT_KINDS)[number];
+
+/** 학급 일정 (행사 등). 학부모 상담 일정은 관찰·상담 기록(planned)으로 따로 둔다 */
+export interface ClassEvent extends Stamped {
+  id: string;
+  kind: EventKind;
+  title: string;
+  date: DateStr;
+  /** 'HH:MM' — 없으면 하루 종일 */
+  time?: string;
+  memo?: string;
+}
+
 /** 자리 배치 한 번. seats 는 교탁 쪽 첫 줄 왼쪽(학생이 칠판을 볼 때)부터 줄마다 */
 export interface SeatPlan extends Stamped {
   id: string;
@@ -229,6 +243,7 @@ export interface AppState {
   checklists: Checklist[];
   pilsa: PilsaTask[];
   seatPlans: SeatPlan[];
+  events: ClassEvent[];
   behavior: BehaviorDraft[];
   calendarLinks: CalendarLink[];
   holidays: Holiday[];
@@ -261,6 +276,7 @@ export function emptyState(): AppState {
     checklists: [],
     pilsa: [],
     seatPlans: [],
+    events: [],
     behavior: [],
     calendarLinks: [],
     holidays: [...PUBLIC_HOLIDAYS],

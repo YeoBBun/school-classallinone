@@ -18,6 +18,7 @@ import { Icon } from './icons';
 import { clean, RecordForm } from './RecordForm';
 import { RecordItem } from './RecordItem';
 import { TodoCard } from './TodoCard';
+import { FieldTripIntake } from './FieldTripIntake';
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7];
@@ -40,6 +41,7 @@ export function Today() {
   const [date, setDate] = useState(today);
   const [entryFor, setEntryFor] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const [intake, setIntake] = useState(false);
   const now = today();
   const holiday = holidays.get(date);
   const { main, weekday } = bigDate(date);
@@ -95,6 +97,9 @@ export function Today() {
             <div className="card-head">
               <h3>학생을 누르세요</h3>
               <span className="muted">{state.students.length}명</span>
+              <button className="small trip-btn" onClick={() => setIntake(true)}>
+                <Icon name="plane" size={15} /> 체험학습 접수
+              </button>
             </div>
             <RosterGrid date={date} records={todays} onPick={setPicked} />
           </section>
@@ -113,6 +118,7 @@ export function Today() {
           onClose={() => setPicked(null)}
         />
       )}
+      {intake && <FieldTripIntake onClose={() => setIntake(false)} />}
       {entryFor && <QuickEntry studentId={entryFor} date={date} onClose={() => setEntryFor(null)} />}
     </div>
   );

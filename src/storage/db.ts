@@ -84,6 +84,7 @@ export function normalize(raw: unknown): AppState {
     checklists: list(s.checklists),
     pilsa: list(s.pilsa),
     seatPlans: list(s.seatPlans),
+    events: list(s.events),
     behavior: list(s.behavior),
     calendarLinks: list(s.calendarLinks),
     holidays: s.holidays,

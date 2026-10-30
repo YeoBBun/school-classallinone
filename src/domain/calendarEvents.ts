@@ -11,11 +11,15 @@ export interface DesiredEvent {
   date: DateStr;
   /** 'HH:MM' — 없으면 하루 종일 */
   time?: string;
+  /** 시각이 있을 때 길이 (분) */
+  minutes?: number;
   description: string;
 }
 
 /** 상담 시간 기본 길이 (분) */
 export const CONSULT_MINUTES = 30;
+/** 학급 일정 기본 길이 (분) */
+export const EVENT_MINUTES = 60;
 
 export function desiredEvents(s: AppState): DesiredEvent[] {
   const name = (id: string) => {
@@ -33,8 +37,19 @@ export function desiredEvents(s: AppState): DesiredEvent[] {
       summary: `학부모 상담: ${who}${how ? ` (${how})` : ''}`,
       date: n.date,
       time: n.time,
+      minutes: CONSULT_MINUTES,
       // 상담 내용은 캘린더에 넣지 않는다 (학급관리 앱에만)
       description: '학급관리 앱에서 넣은 일정',
+    });
+  }
+  for (const e of s.events) {
+    out.push({
+      key: `event:${e.id}`,
+      summary: e.title,
+      date: e.date,
+      time: e.time,
+      minutes: EVENT_MINUTES,
+      description: [e.memo, '학급관리 앱에서 넣은 일정'].filter(Boolean).join('\n'),
     });
   }
   for (const c of s.checklists) {
@@ -45,7 +60,7 @@ export function desiredEvents(s: AppState): DesiredEvent[] {
 }
 
 export function eventHash(e: DesiredEvent): string {
-  return JSON.stringify([e.summary, e.date, e.time ?? '', e.description]);
+  return JSON.stringify([e.summary, e.date, e.time ?? '', e.minutes ?? 0, e.description]);
 }
 
 export interface CalendarPlan {

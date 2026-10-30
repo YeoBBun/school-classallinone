@@ -3,7 +3,7 @@
  * 화면과 떨어뜨려 두고 테스트한다.
  */
 import { addDays } from './calendar';
-import type { AppState, Checklist, DateStr, Note, PilsaTask, Settings, Student } from './types';
+import type { AppState, Checklist, ClassEvent, DateStr, Note, PilsaTask, Settings, Student } from './types';
 
 // ─── 제출물 ───
 
@@ -91,6 +91,7 @@ export function newSchoolYear(s: AppState): AppState {
     checklists: [],
     pilsa: [],
     seatPlans: [],
+    events: [],
     behavior: [],
     calendarLinks: [],
     settings: {
@@ -107,6 +108,8 @@ export function newSchoolYear(s: AppState): AppState {
 export interface TodoSummary {
   /** 앞으로 14일 안의 상담 일정 (가까운 순) */
   upcoming: Note[];
+  /** 앞으로 14일 안의 학급 일정 (가까운 순) */
+  events: ClassEvent[];
   /** 날짜가 지났는데 결과를 안 적은 상담 */
   unwritten: Note[];
   /** 끝나지 않은 할 일(후속 조치) */
@@ -134,6 +137,7 @@ export function todoSummary(s: AppState, today: DateStr): TodoSummary {
   }
   return {
     upcoming: planned.filter((n) => n.date >= today && n.date <= soon).sort(byWhen),
+    events: s.events.filter((e) => e.date >= today && e.date <= soon).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))),
     unwritten: planned.filter((n) => n.date < today).sort(byWhen),
     followUps: s.notes.filter((n) => n.followUp?.trim() && !n.followUpDone).sort((a, b) => a.date.localeCompare(b.date)),
     checklists,

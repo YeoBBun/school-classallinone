@@ -1,20 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { formatKo, schoolYearOf, schoolYearRange, today } from '../domain/calendar';
-import { checklistProgress, pilsaSummary } from '../domain/classroom';
+import { checklistProgress, neisBytes, pilsaSummary } from '../domain/classroom';
 import { summarize } from '../domain/stats';
-import { itemKey, matchesQuery, noteCounts, studentTimeline, type TimelineItem } from '../domain/student';
+import { matchesQuery, studentTimeline, type TimelineItem } from '../domain/student';
 import { KINDS, NOTE_KINDS, STATUSES, type AttendanceRecord, type Note, type NoteKind, type Student } from '../domain/types';
 import { useStore } from '../store';
-import { Modal, recordTitle } from './common';
+import { Modal, recordDates, recordTitle } from './common';
 import { Icon, type IconName } from './icons';
 import { NoteForm } from './NoteForm';
 import { RecordForm } from './RecordForm';
-import { RecordItem } from './RecordItem';
 import { QuickEntry } from './Today';
 import { GiveForm } from './PilsaView';
 import { Menu, nameOf, PrintSheet } from './ui';
-
-type Filter = 'all' | 'attendance' | NoteKind | 'pilsa' | 'todo';
 
 export const NOTE_CLASS: Record<NoteKind, string> = { 관찰: 'n-obs', 학생상담: 'n-counsel', 학부모상담: 'n-parent' };
 
@@ -68,11 +65,14 @@ const ADD_CHOICES: readonly { id: Adding; label: string; icon: IconName }[] = [
   { id: 'pilsa', label: '필사 부여', icon: 'doc' },
 ];
 
+/**
+ * 학생 기록: 이 학생에 대해 적은 것을 종류별 칸으로 나눠 한 화면에.
+ * 출결 → (예정 상담·할 일·안 낸 제출물) → 상담 → 관찰 → 필사 → 행발 순서.
+ */
 function StudentPage({ studentId }: { studentId: string }) {
-  const { state, holidays, warnings } = useStore();
+  const { state, holidays, warnings, update } = useStore();
   const student = state.students.find((s) => s.id === studentId)!;
   const [year, setYear] = useState(() => schoolYearOf(today()));
-  const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [adding, setAdding] = useState<Adding | null>(null);
@@ -91,46 +91,37 @@ function StudentPage({ studentId }: { studentId: string }) {
     return [...set].sort((a, b) => b - a);
   }, [state.records, state.notes, studentId]);
 
-  const items = useMemo(() => studentTimeline(studentId, state, from, to), [studentId, state, from, to]);
+  const all = useMemo(() => studentTimeline(studentId, state, from, to), [studentId, state, from, to]);
+  const q = (query ?? '').trim();
+  const items = q ? all.filter((it) => matchesQuery(it, q)) : all;
   const summary = useMemo(
     () => summarize([student], state.records, holidays, warnings, from, to, today())[0],
     [student, state.records, holidays, warnings, from, to],
   );
-  const notes = noteCounts(items);
-  const pilsa = pilsaSummary(state.pilsa, studentId, from, to);
-  const planned = items
-    .flatMap((it) => (it.type === 'note' && it.note.planned ? [it.note] : []))
-    .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')));
-  const missing = state.checklists.filter((c) => !c.closed && checklistProgress(c, [student]).missing.length > 0);
   const times = (st: (typeof STATUSES)[number]) => KINDS.reduce((n, k) => n + summary.counts[st][k], 0);
-  const lateEtc = times('지각') + times('조퇴') + times('결과');
+  const pilsa = pilsaSummary(state.pilsa, studentId, from, to);
+  const missing = state.checklists.filter((c) => !c.closed && checklistProgress(c, [student]).missing.length > 0);
+  const behavior = state.behavior.find((b) => b.id === `${year}:${studentId}`);
 
-  // 요약 한 줄: 0 인 것은 숨기고, 누르면 그것만 거른다
-  const chips: { f: Filter; text: string; warn?: boolean }[] = [
-    { f: 'attendance', text: `결석 ${summary.absenceDays}일${lateEtc ? ` · 지각·조퇴 ${lateEtc}` : ''}` },
-    ...NOTE_KINDS.filter((k) => notes[k] > 0).map((k) => ({ f: k as Filter, text: `${k} ${notes[k]}` })),
-    ...(pilsa.pages ? [{ f: 'pilsa' as Filter, text: pilsa.remaining ? `필사 ${pilsa.remaining}장 남음` : `필사 ${pilsa.pages}장`, warn: pilsa.remaining > 0 }] : []),
-    ...(notes.todo ? [{ f: 'todo' as Filter, text: `할 일 ${notes.todo}`, warn: true }] : []),
-  ];
-
-  const q = (query ?? '').trim();
-  const shown = items.filter(
-    (it) =>
-      matchesQuery(it, q) &&
-      (filter === 'all' ||
-        it.type === filter ||
-        (filter === 'todo' && it.type === 'note' && !!it.note.followUp && !it.note.followUpDone) ||
-        (it.type === 'note' && it.note.kind === filter)),
-  );
+  const notes = items.flatMap((it) => (it.type === 'note' ? [it.note] : []));
+  const planned = notes.filter((n) => n.planned).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')));
+  const counsel = notes.filter((n) => !n.planned && n.kind !== '관찰');
+  const observe = notes.filter((n) => n.kind === '관찰');
+  const todos = notes.filter((n) => n.followUp?.trim() && !n.followUpDone);
+  const records = items.flatMap((it) => (it.type === 'attendance' ? [it.record] : []));
+  const tasks = items.flatMap((it) => (it.type === 'pilsa' ? [it.task] : []));
+  const toggleDone = (id: string) => update((s) => ({ ...s, notes: s.notes.map((n) => (n.id === id ? { ...n, followUpDone: !n.followUpDone } : n)) }));
+  const parentInfo = (n: Note) => [n.parentWho, n.parentMethod].filter(Boolean).join(' · ');
 
   return (
-    <div className={`student-page${hidden ? ' privacy' : ''}`}>
+    <div className={`student-page profile${hidden ? ' privacy' : ''}`}>
       <header className="page-head">
         <a href="#today" className="icon-btn" aria-label="오늘로">
           <Icon name="left" size={22} />
         </a>
         <h2 className="student-title">
           {student.number}. {student.name}
+          {year !== schoolYearOf(today()) && <span className="muted small"> {year}학년도</span>}
         </h2>
         <span className="spacer" />
         <button className="primary add-btn" onClick={() => setChoosing(true)} aria-label="남기기">
@@ -155,51 +146,174 @@ function StudentPage({ studentId }: { studentId: string }) {
         </Menu>
       </header>
 
-      <div className="summary-line">
-        {chips.map((c) => (
-          <button key={c.f} className={`chip${filter === c.f ? ' on' : ''}${c.warn ? ' warn' : ''}`} onClick={() => setFilter(filter === c.f ? 'all' : c.f)}>
-            {c.text}
-          </button>
-        ))}
-        {filter !== 'all' && (
-          <button className="link small" onClick={() => setFilter('all')}>
-            전체 보기
-          </button>
-        )}
-      </div>
+      {query !== null && <input type="search" className="wide" autoFocus value={query} placeholder="이 학생 기록에서 찾기" onChange={(e) => setQuery(e.target.value)} />}
 
-      {(planned.length > 0 || missing.length > 0 || summary.missingDocCount > 0) && (
-        <ul className="heads-up">
-          {planned.map((n) => (
-            <li key={n.id}>
-              <button className="link" onClick={() => setEditingNote(n)}>
-                {formatKo(n.date)} {n.time} 학부모 상담{n.date < today() ? ' — 결과를 적어 주세요' : ''}
-              </button>
-            </li>
-          ))}
-          {summary.missingDocCount > 0 && <li>받을 출결 서류 {summary.missingDocCount}개</li>}
-          {missing.length > 0 && <li>안 낸 제출물: {missing.map((c) => c.title).join(', ')}</li>}
-        </ul>
+      {/* 출결: 숫자 한 줄 + 기록 */}
+      <Section title="출결" count={records.length}>
+        <div className="stat-line">
+          <span>
+            결석 <b>{summary.absenceDays}</b>일{summary.approvedAbsenceDays > 0 && <span className="muted"> (출석인정 {summary.approvedAbsenceDays}일)</span>}
+          </span>
+          <span>
+            지각 <b>{times('지각')}</b>
+          </span>
+          <span>
+            조퇴 <b>{times('조퇴')}</b>
+          </span>
+          <span>
+            결과 <b>{times('결과')}</b>
+          </span>
+          {summary.missingDocCount > 0 && <span className="late">받을 서류 {summary.missingDocCount}</span>}
+        </div>
+        {records.length > 0 && (
+          <ul className="rec-rows">
+            {records.map((r) => {
+              const need = r.docs.filter((d) => d.required && !d.received);
+              return (
+                <li key={r.id}>
+                  <button className="rec-row" onClick={() => setEditingRecord(r)}>
+                    <span className="when">{recordDates(r)}</span>
+                    <span className="body">
+                      <b>{recordTitle(r)}</b>
+                      {r.memo && <span className="muted"> · {r.memo}</span>}
+                      {need.length > 0 && <span className="late"> · {need.map((d) => d.label).join(', ')} 안 받음</span>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
+
+      {(planned.length > 0 || todos.length > 0 || missing.length > 0) && (
+        <Section title="챙겨야 할 것">
+          <ul className="rec-rows">
+            {planned.map((n) => (
+              <li key={n.id}>
+                <button className="rec-row" onClick={() => setEditingNote(n)}>
+                  <span className="when">{formatKo(n.date)}</span>
+                  <span className="body">
+                    <b>학부모 상담 {n.time}</b>
+                    {parentInfo(n) && <span className="muted"> · {parentInfo(n)}</span>}
+                    {n.date < today() && <span className="late"> · 결과 적기</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {todos.map((n) => (
+              <li key={`t${n.id}`}>
+                <label className="rec-row check-row">
+                  <span className="when">
+                    <input type="checkbox" checked={false} onChange={() => toggleDone(n.id)} />
+                  </span>
+                  <span className="body">
+                    할 일: {n.followUp} <span className="muted">({formatKo(n.date)} {n.kind})</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+            {missing.map((c) => (
+              <li key={c.id}>
+                <a className="rec-row" href="#checklists">
+                  <span className="when">{c.dueDate ? formatKo(c.dueDate) : '제출물'}</span>
+                  <span className="body">
+                    <b>{c.title}</b> <span className="late">안 냄</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Section>
       )}
 
-      {query !== null && <input type="search" className="wide" autoFocus value={query} placeholder="내용 검색" onChange={(e) => setQuery(e.target.value)} />}
+      <Section title="상담" count={counsel.length} onAdd={() => setAdding('학생상담')}>
+        {counsel.length === 0 ? (
+          <p className="muted">아직 없어요.</p>
+        ) : (
+          <ul className="rec-rows">
+            {counsel.map((n) => (
+              <li key={n.id}>
+                <button className="rec-row" onClick={() => setEditingNote(n)}>
+                  <span className="when">{formatKo(n.date)}</span>
+                  <span className="body">
+                    <span className="kind">
+                      {n.kind === '학부모상담' ? `학부모${parentInfo(n) ? ` (${parentInfo(n)})` : ''}` : '학생'}
+                      {n.studentIds.length > 1 && ` · 같이: ${n.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id)).join(', ')}`}
+                    </span>
+                    <span className="text private">{n.content}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
-      {shown.length === 0 ? (
-        <div className="empty">
-          <p>{items.length === 0 ? '아직 남긴 것이 없어요. [＋]를 눌러 남겨 보세요.' : '맞는 기록이 없어요.'}</p>
-        </div>
-      ) : (
-        <ul className="records">
-          {shown.map((it) => (
-            <TimelineRow
-              key={itemKey(it)}
-              item={it}
-              studentId={studentId}
-              onEditNote={setEditingNote}
-              onEditRecord={setEditingRecord}
-            />
-          ))}
-        </ul>
+      <Section title="관찰" count={observe.length} onAdd={() => setAdding('관찰')}>
+        {observe.length === 0 ? (
+          <p className="muted">아직 없어요.</p>
+        ) : (
+          <ul className="rec-rows">
+            {observe.map((n) => (
+              <li key={n.id}>
+                <button className="rec-row" onClick={() => setEditingNote(n)}>
+                  <span className="when">{formatKo(n.date)}</span>
+                  <span className="body">
+                    {n.studentIds.length > 1 && (
+                      <span className="kind">같이: {n.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id)).join(', ')}</span>
+                    )}
+                    <span className="text private">{n.content}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {tasks.length > 0 && (
+        <Section title="필사" count={tasks.length}>
+          <div className="stat-line">
+            <span>
+              총 <b>{pilsa.pages}</b>장
+            </span>
+            <span>
+              낸 것 <b>{pilsa.submitted}</b>장
+            </span>
+            {pilsa.remaining > 0 ? <span className="late">{pilsa.remaining}장 남음</span> : <span className="ok">다 냄</span>}
+          </div>
+          <ul className="rec-rows">
+            {tasks.map((t) => {
+              const left = t.pages - Math.min(t.submitted.length, t.pages);
+              return (
+                <li key={t.id}>
+                  <a className="rec-row" href="#pilsa">
+                    <span className="when">{formatKo(t.date)}</span>
+                    <span className="body">
+                      <b>{t.pages}장</b>
+                      {t.reason && <span className="muted"> · {t.reason}</span>}
+                      <span className={left ? 'late' : 'muted'}> · {left ? `${left}장 남음` : '다 냄'}</span>
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
+      {behavior?.text && (
+        <Section title="행발 초안">
+          <a className="rec-row" href="#behavior">
+            <span className="body">
+              <span className="text private">{behavior.text}</span>
+              <span className="muted small">
+                {neisBytes(behavior.text)}바이트{behavior.done ? ' · 다 씀' : ''}
+              </span>
+            </span>
+          </a>
+        </Section>
       )}
 
       {choosing && (
@@ -214,9 +328,7 @@ function StudentPage({ studentId }: { studentId: string }) {
           </div>
         </Modal>
       )}
-      {adding && NOTE_KINDS.includes(adding as NoteKind) && (
-        <NoteForm studentId={studentId} defaultKind={adding as NoteKind} onClose={() => setAdding(null)} />
-      )}
+      {adding && NOTE_KINDS.includes(adding as NoteKind) && <NoteForm studentId={studentId} defaultKind={adding as NoteKind} onClose={() => setAdding(null)} />}
       {adding === 'planned' && <NoteForm studentId={studentId} planned onClose={() => setAdding(null)} />}
       {adding === 'attendance' && <QuickEntry studentId={studentId} date={today()} onClose={() => setAdding(null)} />}
       {adding === 'pilsa' && <GiveForm studentId={studentId} onClose={() => setAdding(null)} />}
@@ -224,74 +336,30 @@ function StudentPage({ studentId }: { studentId: string }) {
       {editingRecord && <RecordForm initial={editingRecord} onClose={() => setEditingRecord(null)} />}
       {printing && (
         <PrintSheet onDone={() => setPrinting(false)}>
-          <StudentPrint student={student} year={year} items={items} absence={summary.absenceDays} late={times('지각')} early={times('조퇴')} />
+          <StudentPrint student={student} year={year} items={all} absence={summary.absenceDays} late={times('지각')} early={times('조퇴')} />
         </PrintSheet>
       )}
     </div>
   );
 }
 
-
-function TimelineRow({
-  item,
-  studentId,
-  onEditNote,
-  onEditRecord,
-}: {
-  item: TimelineItem;
-  studentId: string;
-  onEditNote: (n: Note) => void;
-  onEditRecord: (r: AttendanceRecord) => void;
-}) {
-  if (item.type === 'attendance') return <RecordItem record={item.record} onEdit={() => onEditRecord(item.record)} />;
-  if (item.type === 'note') return <NoteItem note={item.note} studentId={studentId} onEdit={() => onEditNote(item.note)} />;
-  const t = item.task;
-  const left = t.pages - Math.min(t.submitted.length, t.pages);
+/** 학생 기록의 한 칸: 제목·건수, (있으면) 바로 남기기 */
+function Section({ title, count, onAdd, children }: { title: string; count?: number; onAdd?: () => void; children: ReactNode }) {
   return (
-    <li className="record">
-      <a className="record-main" href="#pilsa">
-        <span className="date">{formatKo(t.date)}</span>
-        <span className="tag k-pilsa">필사 {t.pages}장</span>
-        {t.reason && <span className="memo">{t.reason}</span>}
-        <span className={left ? 'late small' : 'muted small'}>{left ? `${left}장 남음` : '다 냄'}</span>
-      </a>
-    </li>
-  );
-}
-
-function NoteItem({ note, studentId, onEdit }: { note: Note; studentId: string; onEdit: () => void }) {
-  const { state, update, removeNote } = useStore();
-  const others = note.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id));
-  const parent = note.kind === '학부모상담' ? [note.parentWho, note.parentMethod].filter(Boolean).join(' · ') : '';
-  const toggleDone = () =>
-    update((s) => ({ ...s, notes: s.notes.map((n) => (n.id === note.id ? { ...n, followUpDone: !n.followUpDone } : n)) }));
-
-  return (
-    <li className={`record${note.planned ? ' planned' : ''}`}>
-      <div className="record-head">
-        <button className="record-main" onClick={onEdit} title="눌러서 고치기">
-          <span className="date">{formatKo(note.date)}</span>
-          <span className={`tag ${NOTE_CLASS[note.kind]}`}>{note.planned ? `상담 예정 ${note.time ?? ''}` : note.kind}</span>
-          {parent && <span className="memo">{parent}</span>}
-          {others.length > 0 && <span className="memo">같이: {others.join(', ')}</span>}
-          {note.neisDone && <span className="memo">나이스 ✓</span>}
-        </button>
-        <button className="del-btn" onClick={() => removeNote(note.id, `${formatKo(note.date)} ${note.kind}`)} aria-label="삭제">
-          삭제
-        </button>
+    <section className="card rec-section">
+      <div className="card-head">
+        <h3>
+          {title}
+          {count !== undefined && count > 0 && <span className="muted"> {count}</span>}
+        </h3>
+        {onAdd && (
+          <button className="ghost small" onClick={onAdd} aria-label={`${title} 남기기`}>
+            <Icon name="plus" size={15} /> 남기기
+          </button>
+        )}
       </div>
-      {note.content && (
-        <p className="note-text private" onClick={onEdit}>
-          {note.content}
-        </p>
-      )}
-      {note.followUp && (
-        <label className={`follow-up${note.followUpDone ? ' done' : ''}`}>
-          <input type="checkbox" checked={!!note.followUpDone} onChange={toggleDone} />
-          할 일: {note.followUp}
-        </label>
-      )}
-    </li>
+      {children}
+    </section>
   );
 }
 

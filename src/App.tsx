@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { BehaviorView } from './components/BehaviorView';
 import { ChecklistView } from './components/ChecklistView';
 import { Dashboard } from './components/Dashboard';
-import { FieldTripIntake } from './components/FieldTripIntake';
 import { NuggaView } from './components/NuggaView';
 import { PilsaView } from './components/PilsaView';
+import { ScheduleView } from './components/ScheduleView';
 import { SeatingView } from './components/SeatingView';
 import { Icon, type IconName } from './components/icons';
 import { RecordList } from './components/RecordList';
@@ -17,16 +17,11 @@ import { StoreProvider, useNeedBackup, useStore } from './store';
 import { isGithub, loadSyncConfig } from './sync/cloud';
 
 /**
- * 메뉴는 «오늘»과 «더보기» 둘. 매일 하는 일(출결, 학생 기록)은 오늘 화면에서 학생을 눌러 끝낸다.
- * 설정은 머리글의 톱니바퀴.
+ * 메뉴는 오늘 / 더보기 / 설정. 매일 하는 일(출결, 학생 기록)은 오늘 화면에서 학생을 눌러 끝낸다.
+ * «더보기» 는 화면을 넘기지 않고 그 자리에서 작은 창으로 연다 (어느 화면에서든 한 번에 이동).
  */
-const TABS: readonly { id: 'today' | 'more'; label: string; icon: IconName }[] = [
-  { id: 'today', label: '오늘', icon: 'today' },
-  { id: 'more', label: '더보기', icon: 'grid' },
-];
-
-/** «더보기» 안의 화면 (출결·생기부는 안에서 탭으로 나뉜다) */
-const MORE: readonly { id: 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'records'; label: string; icon: IconName }[] = [
+const MORE: readonly { id: 'schedule' | 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'records'; label: string; icon: IconName }[] = [
+  { id: 'schedule', label: '일정', icon: 'today' },
   { id: 'checklists', label: '제출물', icon: 'check' },
   { id: 'pilsa', label: '필사', icon: 'doc' },
   { id: 'seating', label: '자리', icon: 'grid' },
@@ -36,17 +31,17 @@ const MORE: readonly { id: 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'record
 
 /** 한 화면 안의 탭: 주소는 따로 두어 예전 링크도 그대로 열린다 */
 const SUBTABS = {
-  records: { group: '출결', tabs: [{ id: 'records', label: '기록' }, { id: 'stats', label: '통계' }] },
-  stats: { group: '출결', tabs: [{ id: 'records', label: '기록' }, { id: 'stats', label: '통계' }] },
-  nuga: { group: '생기부', tabs: [{ id: 'nuga', label: '누가기록' }, { id: 'behavior', label: '행발' }] },
-  behavior: { group: '생기부', tabs: [{ id: 'nuga', label: '누가기록' }, { id: 'behavior', label: '행발' }] },
+  records: [{ id: 'records', label: '기록' }, { id: 'stats', label: '통계' }],
+  stats: [{ id: 'records', label: '기록' }, { id: 'stats', label: '통계' }],
+  nuga: [{ id: 'nuga', label: '누가기록' }, { id: 'behavior', label: '행발' }],
+  behavior: [{ id: 'nuga', label: '누가기록' }, { id: 'behavior', label: '행발' }],
 } as const;
 
-type Page = (typeof TABS)[number]['id'] | (typeof MORE)[number]['id'] | 'students' | 'stats' | 'behavior' | 'settings';
-const PAGES: readonly string[] = [...TABS.map((t) => t.id), ...MORE.map((m) => m.id), 'students', 'stats', 'behavior', 'settings'];
+type Page = 'today' | (typeof MORE)[number]['id'] | 'students' | 'stats' | 'behavior' | 'settings';
+const PAGES: readonly string[] = ['today', ...MORE.map((m) => m.id), 'students', 'stats', 'behavior', 'settings'];
 
-/** 예전 주소(#dashboard, #calendar)로 들어와도 맞는 화면을 연다. */
-const LEGACY: Record<string, Page> = { dashboard: 'stats', calendar: 'records' };
+/** 예전 주소(#dashboard, #calendar, #more)로 들어와도 맞는 화면을 연다. */
+const LEGACY: Record<string, Page> = { dashboard: 'stats', calendar: 'records', more: 'today' };
 
 /** 주소 뒤 #쪽/세부 (예: #students/학생id) */
 function readRoute(): { page: Page; sub: string | null } {
@@ -59,14 +54,16 @@ function readRoute(): { page: Page; sub: string | null } {
 function Shell() {
   const { state, saveError, sync } = useStore();
   const [route, setRoute] = useState(readRoute);
+  const [moreOpen, setMoreOpen] = useState(false);
   const needBackup = useNeedBackup();
   const { page, sub } = route;
   // 학생 기록은 오늘 화면에서 열리므로 «오늘»이 켜진 채로 둔다
-  const tab = page === 'today' || page === 'students' ? 'today' : page === 'settings' ? null : 'more';
+  const tab = page === 'today' || page === 'students' ? 'today' : page === 'settings' ? 'settings' : 'more';
 
   useEffect(() => {
     const onHash = () => {
       setRoute(readRoute());
+      setMoreOpen(false);
       window.scrollTo(0, 0);
     };
     window.addEventListener('hashchange', onHash);
@@ -90,26 +87,34 @@ function Shell() {
               ⚠ 동기화 안 됨
             </a>
           )}
-          <a href="#settings" className={`icon-btn settings-btn${page === 'settings' ? ' on' : ''}`} aria-label="설정" title="설정">
-            <Icon name="gear" size={20} />
-            {needBackup && <span className="dot" title="백업할 때가 됐어요" />}
-          </a>
         </div>
         <nav aria-label="메뉴">
-          {TABS.map((t) => (
-            <a key={t.id} href={`#${t.id}`} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined}>
-              <Icon name={t.icon} />
-              <span className="nav-label">{t.label}</span>
-            </a>
-          ))}
+          <a href="#today" className={tab === 'today' ? 'on' : ''} aria-current={tab === 'today' ? 'page' : undefined}>
+            <Icon name="today" />
+            <span className="nav-label">오늘</span>
+          </a>
+          <button
+            className={`nav-btn${tab === 'more' || moreOpen ? ' on' : ''}`}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(!moreOpen)}
+          >
+            <Icon name="grid" />
+            <span className="nav-label">더보기</span>
+          </button>
+          <a href="#settings" className={tab === 'settings' ? 'on' : ''} aria-current={tab === 'settings' ? 'page' : undefined}>
+            <Icon name="gear" />
+            <span className="nav-label">설정</span>
+            {needBackup && <span className="dot" title="백업할 때가 됐어요" />}
+          </a>
         </nav>
       </header>
+      {moreOpen && <MorePopup current={page} onClose={() => setMoreOpen(false)} />}
       {saveError && <div className="banner error">{saveError}</div>}
       <main>
-        {tab === 'more' && page !== 'more' && <SubHead page={page} />}
+        {page in SUBTABS && <SubTabs page={page as keyof typeof SUBTABS} />}
         {(page === 'today' || (page === 'students' && !sub)) && <Today />}
         {page === 'students' && sub && <StudentsView studentId={sub} />}
-        {page === 'more' && <MoreMenu />}
+        {page === 'schedule' && <ScheduleView />}
         {page === 'records' && <RecordList initialView={location.hash === '#calendar' ? 'calendar' : 'list'} />}
         {page === 'stats' && <Dashboard />}
         {page === 'checklists' && <ChecklistView />}
@@ -123,35 +128,43 @@ function Shell() {
   );
 }
 
-/** «더보기» 안 화면 위: 뒤로 가기와 (있으면) 그 묶음의 탭 */
-function SubHead({ page }: { page: Page }) {
-  const sub = SUBTABS[page as keyof typeof SUBTABS];
-  const [trip, setTrip] = useState(false);
+/** 출결(기록·통계), 생기부(누가기록·행발) 안의 탭 */
+function SubTabs({ page }: { page: keyof typeof SUBTABS }) {
   return (
     <div className="sub-head">
-      <a href="#more" className="button ghost back-link">
-        <Icon name="left" /> 더보기
-      </a>
-      {sub && (
-        <>
-          <div className="seg">
-            {sub.tabs.map((t) => (
-              <a key={t.id} href={`#${t.id}`} className={`seg-link${t.id === page ? ' on' : ''}`}>
-                {t.label}
+      <div className="seg">
+        {SUBTABS[page].map((t) => (
+          <a key={t.id} href={`#${t.id}`} className={`seg-link${t.id === page ? ' on' : ''}`}>
+            {t.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** «더보기»: 화면을 넘기지 않고 작은 창으로 연다. 바깥을 누르거나 Esc 로 닫는다 */
+function MorePopup({ current, onClose }: { current: Page; onClose: () => void }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+  const group = (id: Page) => (id === 'stats' ? 'records' : id === 'behavior' ? 'nuga' : id);
+  return (
+    <div className="more-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="more-pop" role="dialog" aria-label="더보기">
+        <ul className="more-grid">
+          {MORE.map((m) => (
+            <li key={m.id}>
+              <a href={`#${m.id}`} className={`more-tile${group(current) === m.id ? ' on' : ''}`} onClick={onClose}>
+                <Icon name={m.icon} size={26} />
+                <b>{m.label}</b>
               </a>
-            ))}
-          </div>
-          {sub.group === '출결' && (
-            <>
-              <span className="spacer" />
-              <button className="small" onClick={() => setTrip(true)}>
-                <Icon name="plane" size={15} /> 체험학습 접수
-              </button>
-            </>
-          )}
-        </>
-      )}
-      {trip && <FieldTripIntake onClose={() => setTrip(false)} />}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -172,21 +185,6 @@ function GoogleReconnect() {
     >
       구글 다시 연결
     </button>
-  );
-}
-
-function MoreMenu() {
-  return (
-    <ul className="more-grid">
-      {MORE.map((m) => (
-        <li key={m.id}>
-          <a href={`#${m.id}`} className="more-tile">
-            <Icon name={m.icon} size={26} />
-            <b>{m.label}</b>
-          </a>
-        </li>
-      ))}
-    </ul>
   );
 }
 

@@ -5,13 +5,11 @@ import { pendingDocs, shortTitle } from '../domain/pending';
 import { DOC_FT_REPORT } from '../domain/rules';
 import type { AttendanceRecord, Note } from '../domain/types';
 import { useStore } from '../store';
-import { Modal, sortStudents } from './common';
-import { Icon } from './icons';
 import { NoteForm } from './NoteForm';
 import { RecordForm } from './RecordForm';
 import { nameOf } from './ui';
 
-/** 오늘 화면의 «챙길 일» 하나에 다: 받을 서류, 상담 일정, 할 일, 덜 걷힌 제출물, 필사 */
+/** 오늘 화면의 «처리할 일» 하나에 다: 받을 서류, 다가오는 일정(상담·학급), 할 일, 덜 걷힌 제출물, 필사. 일정 추가는 더보기 → 일정 */
 export function TodoCard() {
   const { state, update, holidays } = useStore();
   const now = today();
@@ -29,21 +27,17 @@ export function TodoCard() {
         r.id === recordId ? { ...r, docs: r.docs.map((d) => (d.key === key ? { ...d, received: true, receivedDate: now } : d)) } : r,
       ),
     }));
-  const [planFor, setPlanFor] = useState<string | 'pick' | null>(null);
   const who = (n: Note) => n.studentIds.map((id) => nameOf(state.students, id)).join(', ');
   const empty =
-    !docs.length && !t.upcoming.length && !t.unwritten.length && !t.followUps.length && !t.checklists.length && !t.pilsaStudents;
+    !docs.length && !t.upcoming.length && !t.events.length && !t.unwritten.length && !t.followUps.length && !t.checklists.length && !t.pilsaStudents;
 
   return (
     <section className="card todo-card">
       <div className="card-head">
-        <h3>챙길 일</h3>
-        <button className="ghost small" onClick={() => setPlanFor('pick')}>
-          <Icon name="plus" size={15} /> 상담 일정
-        </button>
+        <h3>처리할 일</h3>
       </div>
       {empty ? (
-        <p className="muted">챙길 일이 없어요.</p>
+        <p className="muted">처리할 일이 없어요.</p>
       ) : (
         <ul className="todo-list">
           {docs.map(({ record: r, doc, deadline }) => (
@@ -76,9 +70,19 @@ export function TodoCard() {
               <button className="row-btn" onClick={() => setOpen(n)}>
                 <span className="who">{who(n)}</span>
                 <span className="detail">
-                  📅 {n.date === now ? '오늘' : formatKo(n.date)} {n.time} 학부모 상담{n.parentWho ? ` (${n.parentWho})` : ''}
+                  {n.date === now ? '오늘' : formatKo(n.date)} {n.time} 학부모 상담{n.parentWho ? ` (${n.parentWho})` : ''}
                 </span>
               </button>
+            </li>
+          ))}
+          {t.events.map((e) => (
+            <li key={e.id}>
+              <a className="row-btn" href="#schedule">
+                <span className="who">{e.kind}</span>
+                <span className="detail">
+                  {e.date === now ? '오늘' : formatKo(e.date)} {e.time} {e.title}
+                </span>
+              </a>
             </li>
           ))}
           {t.followUps.map((n) => (
@@ -117,19 +121,6 @@ export function TodoCard() {
 
       {open && <NoteForm initial={open} studentId={open.studentIds[0]} onClose={() => setOpen(null)} />}
       {record && <RecordForm initial={record} onClose={() => setRecord(null)} />}
-      {planFor === 'pick' && (
-        <Modal title="누구와 상담하나요?" onClose={() => setPlanFor(null)}>
-          <div className="student-grid">
-            {sortStudents(state.students).map((s) => (
-              <button key={s.id} className="student-btn" onClick={() => setPlanFor(s.id)}>
-                <span className="num">{s.number}</span>
-                <span className="nm">{s.name}</span>
-              </button>
-            ))}
-          </div>
-        </Modal>
-      )}
-      {planFor && planFor !== 'pick' && <NoteForm studentId={planFor} planned onClose={() => setPlanFor(null)} />}
     </section>
   );
 }

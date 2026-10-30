@@ -47,7 +47,7 @@ const SYNC_DEBOUNCE_MS = 4000;
 const SYNC_INTERVAL_MS = 60_000;
 
 /** 지우고 되돌릴 수 있는 목록 */
-export type UndoField = 'records' | 'notes' | 'checklists' | 'pilsa' | 'seatPlans';
+export type UndoField = 'records' | 'notes' | 'checklists' | 'pilsa' | 'seatPlans' | 'events';
 
 interface Undo {
   field: UndoField;

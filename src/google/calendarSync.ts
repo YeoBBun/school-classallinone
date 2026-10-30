@@ -2,7 +2,7 @@
  * 앱의 상담 일정·제출 마감을 구글 캘린더 '학급관리' 에 맞춘다.
  * 이미 넣은 일정은 calendarLinks 에 남겨 두고(기기 간 동기화됨), 바뀐 것만 고친다.
  */
-import { CONSULT_MINUTES, desiredEvents, eventHash, isEmptyPlan, planCalendar } from '../domain/calendarEvents';
+import { desiredEvents, eventHash, isEmptyPlan, planCalendar } from '../domain/calendarEvents';
 import type { AppState, CalendarLink } from '../domain/types';
 import * as google from './google';
 
@@ -32,11 +32,11 @@ export async function applyCalendar(s: AppState): Promise<CalendarResult | null>
   const out = new Map(links.map((l) => [l.id, l]));
   try {
     for (const e of plan.create) {
-      const eventId = await google.saveEvent(calendarId, null, { ...e, minutes: CONSULT_MINUTES });
+      const eventId = await google.saveEvent(calendarId, null, e);
       out.set(e.key, { id: e.key, eventId, hash: eventHash(e) });
     }
     for (const { event, link } of plan.update) {
-      const eventId = await google.saveEvent(calendarId, link.eventId, { ...event, minutes: CONSULT_MINUTES });
+      const eventId = await google.saveEvent(calendarId, link.eventId, event);
       out.set(event.key, { ...link, eventId, hash: eventHash(event) });
     }
     for (const link of plan.remove) {
