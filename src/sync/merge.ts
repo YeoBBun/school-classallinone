@@ -5,6 +5,7 @@
  * - 두 기기의 상태를 합칠 때 같은 항목이면 나중에 고친 쪽을 남기고,
  *   지운 시각이 마지막 수정보다 나중이면 지운 채로 둔다.
  */
+import { remapStudents } from '../domain/student';
 import type { AppState, Holiday, Stamped } from '../domain/types';
 
 const TOMBSTONE_KEEP_DAYS = 120;
@@ -15,10 +16,18 @@ const COLLECTIONS = [
   { field: 'records', prefix: 'r:' },
   { field: 'students', prefix: 's:' },
   { field: 'notes', prefix: 'n:' },
+  { field: 'checklists', prefix: 'c:' },
+  { field: 'pilsa', prefix: 'p:' },
+  { field: 'incidents', prefix: 'i:' },
+  { field: 'seatPlans', prefix: 'sp:' },
+  { field: 'behavior', prefix: 'b:' },
+  { field: 'calendarLinks', prefix: 'cl:' },
   { field: 'holidays', prefix: 'h:' },
 ] as const;
 
-function keyOf(field: (typeof COLLECTIONS)[number]['field'], x: unknown): string {
+type Field = (typeof COLLECTIONS)[number]['field'];
+
+function keyOf(field: Field, x: unknown): string {
   return field === 'holidays' ? (x as Holiday).date : (x as { id: string }).id;
 }
 
@@ -59,7 +68,7 @@ export function mergeStates(local: AppState, remote: AppState, now = new Date())
   const out = { ...local, tombstones } as AppState;
   for (const { field, prefix } of COLLECTIONS) {
     const map = new Map<string, Keyed>();
-    for (const x of [...(remote[field] as Keyed[]), ...(local[field] as Keyed[])]) {
+    for (const x of [...((remote[field] ?? []) as Keyed[]), ...((local[field] ?? []) as Keyed[])]) {
       const k = keyOf(field, x);
       if (newer(map.get(k), x)) map.set(k, x);
     }
@@ -69,18 +78,17 @@ export function mergeStates(local: AppState, remote: AppState, now = new Date())
       .sort((a, b) => keyOf(field, a).localeCompare(keyOf(field, b)));
     (out as unknown as Record<string, unknown>)[field] = merged;
   }
-  dedupeStudents(out);
   const settings = newer(remote.settings, local.settings) ? local.settings : remote.settings;
   // 백업 알림은 기기마다 따로 (이 기기에서 백업했는지가 중요하다)
   out.settings = { ...settings, lastBackupAt: local.settings.lastBackupAt };
-  return out;
+  return dedupeStudents(out);
 }
 
 /**
  * 두 기기에서 명단을 따로 등록하면 같은 학생이 다른 id 로 두 번 생긴다.
  * 번호·이름이 같으면 id 가 작은 쪽으로 합치고, 기록도 그 학생으로 옮긴다 (어느 기기에서 해도 같은 결과).
  */
-function dedupeStudents(s: AppState) {
+function dedupeStudents(s: AppState): AppState {
   const keep = new Map<string, string>(); // "번호|이름" → 남길 id
   for (const st of [...s.students].sort((a, b) => a.id.localeCompare(b.id))) {
     const k = `${st.number}|${st.name}`;
@@ -91,26 +99,15 @@ function dedupeStudents(s: AppState) {
     const target = keep.get(`${st.number}|${st.name}`)!;
     if (target !== st.id) remap.set(st.id, target);
   }
-  if (!remap.size) return;
-  s.students = s.students.filter((st) => !remap.has(st.id));
-  s.records = s.records.map((r) => (remap.has(r.studentId) ? { ...r, studentId: remap.get(r.studentId)! } : r));
-  s.notes = s.notes.map((n) =>
-    n.studentIds.some((id) => remap.has(id))
-      ? { ...n, studentIds: [...new Set(n.studentIds.map((id) => remap.get(id) ?? id))] }
-      : n,
-  );
+  return remap.size ? remapStudents(s, remap) : s;
 }
 
 /** 비교용: 순서·기기 전용 값과 관계없이 같은 내용이면 같은 문자열 */
 export function canonical(s: AppState): string {
-  const sortBy = <T,>(arr: T[], key: (x: T) => string) => [...arr].sort((a, b) => key(a).localeCompare(key(b)));
   const { lastBackupAt: _ignored, ...settings } = s.settings;
-  return JSON.stringify({
-    students: sortBy(s.students, (x) => x.id),
-    records: sortBy(s.records, (x) => x.id),
-    notes: sortBy(s.notes, (x) => x.id),
-    holidays: sortBy(s.holidays, (x) => x.date),
-    settings,
-    tombstones: Object.fromEntries(Object.entries(s.tombstones ?? {}).sort()),
-  });
+  const out: Record<string, unknown> = { settings, tombstones: Object.fromEntries(Object.entries(s.tombstones ?? {}).sort()) };
+  for (const { field } of COLLECTIONS) {
+    out[field] = [...((s[field] ?? []) as Keyed[])].sort((a, b) => keyOf(field, a).localeCompare(keyOf(field, b)));
+  }
+  return JSON.stringify(out);
 }

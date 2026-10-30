@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { loadSyncConfig, saveSyncConfig, testConnection, type SyncConfig } from '../sync/cloud';
+import { isGithub, loadSyncConfig, saveSyncConfig, testConnection, type GithubSyncConfig } from '../sync/cloud';
 
 const DEFAULT_REPO = 'YeoBBun/school-attendance-sync';
 
 /**
- * 휴대폰 ↔ PC 동기화 설정.
+ * 깃허브로 맞추기 (고급). 휴대폰 위젯은 이 방식에서만 된다.
  * 토큰·잠금 비밀번호는 이 기기에만 저장하고 백업 파일에 넣지 않는다.
  */
 export function SyncSettings() {
   const { sync, syncNow, widgetSync } = useStore();
-  const saved = loadSyncConfig();
+  const current = loadSyncConfig();
+  const saved = current && isGithub(current) ? current : null;
   const [repo, setRepo] = useState(saved?.repo ?? DEFAULT_REPO);
   const [token, setToken] = useState(saved?.token ?? '');
   const [pass, setPass] = useState(saved?.passphrase ?? '');
@@ -22,7 +23,8 @@ export function SyncSettings() {
     if (!repo.includes('/') || !token.trim()) return setMsg({ ok: false, text: '저장소와 토큰을 넣어 주세요.' });
     if (pass.length < 8) return setMsg({ ok: false, text: '잠금 비밀번호는 8자 이상으로 정해 주세요.' });
     if (pass !== pass2) return setMsg({ ok: false, text: '잠금 비밀번호 두 칸이 서로 달라요.' });
-    const cfg: SyncConfig = { repo: repo.trim(), token: token.trim(), passphrase: pass };
+    if (current && !isGithub(current) && !confirm('지금은 구글 드라이브로 맞추고 있어요. 깃허브로 바꿀까요?')) return;
+    const cfg: GithubSyncConfig = { repo: repo.trim(), token: token.trim(), passphrase: pass };
     setBusy(true);
     const problem = await testConnection(cfg);
     setBusy(false);
@@ -43,8 +45,8 @@ export function SyncSettings() {
   };
 
   return (
-    <section className="card">
-      <h3>휴대폰 ↔ PC 동기화</h3>
+    <details className="card advanced">
+      <summary>고급: 깃허브로 맞추기 (휴대폰 위젯을 쓸 때)</summary>
       <p className="hint">
         휴대폰과 PC에서 같은 저장소·잠금 비밀번호로 연결하면, 어느 쪽에서 입력·수정·삭제해도 다른 쪽에 맞춰져요. 데이터는 잠금 비밀번호로
         잠가서 비공개 깃허브 저장소에 올려요. 토큰과 비밀번호는 <b>이 기기에만</b> 저장되고 백업 파일에는 들어가지 않아요.
@@ -81,7 +83,7 @@ export function SyncSettings() {
         )}
       </div>
       {msg && <p className={msg.ok ? 'info' : 'error'}>{msg.text}</p>}
-    </section>
+    </details>
   );
 }
 

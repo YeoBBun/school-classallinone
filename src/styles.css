@@ -438,3 +438,151 @@ a.student-btn { text-decoration: none; color: inherit; }
 @media (max-width: 640px) {
   .student-actions button { flex: 1; }
 }
+
+/* ───────── 학급 모듈 공통 ───────── */
+.module { display: grid; gap: 14px; }
+.module > .page-head { margin-bottom: 0; }
+.page-title { margin: 0; font-size: 22px; }
+.cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.list-card {
+  display: grid; gap: 8px; width: 100%; text-align: left; justify-content: stretch; justify-items: start;
+  border: none; font-weight: 400; padding: 16px 18px;
+}
+.list-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.late { color: var(--danger); font-weight: 600; }
+.ok { color: var(--ok); font-weight: 600; }
+.grow { flex: 1; min-width: 200px; }
+.add-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.add-row input.wide { flex: 1; min-width: 200px; }
+.progress { display: block; width: 100%; height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.closed-list summary { cursor: pointer; color: var(--text-2); padding: 6px 0; }
+.closed-list .cards { margin-top: 8px; opacity: 0.8; }
+.student-btn.got { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.student-btn.got .small { color: var(--ok); font-weight: 600; }
+.student-btn.exempt { background: var(--surface-2); border-style: dashed; border-color: var(--line); }
+.student-btn.exempt .nm { color: var(--muted); }
+.student-btn.writing { background: var(--warn-bg); }
+input.tiny { width: 56px; }
+.stepper { display: inline-flex; align-items: center; gap: 14px; }
+.stepper button { width: 44px; height: 44px; font-size: 20px; border-radius: 50%; padding: 0; }
+.stepper b { font-size: 20px; min-width: 48px; text-align: center; }
+.warn-tag { --k: var(--danger); }
+.status-0 { --k: var(--danger); }
+.status-1 { --k: #e8710a; }
+.status-2 { --k: var(--muted); }
+.k-pilsa { --k: #2563eb; }
+.k-incident { --k: #dc2626; }
+details.advanced summary { cursor: pointer; font-weight: 600; }
+details.advanced[open] summary { margin-bottom: 8px; }
+.option { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+.option h4 { margin: 0 0 6px; font-size: 15px; }
+
+/* 필사 */
+.pilsa-row { display: grid; gap: 10px; }
+.pilsa-tasks { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.pilsa-tasks li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pilsa-when { min-width: 150px; }
+.pilsa-cells { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.pilsa-cells .cell { width: 26px; height: 26px; padding: 0; border-radius: 6px; background: var(--danger-soft); border: 1.5px solid color-mix(in srgb, var(--danger) 35%, transparent); }
+.pilsa-cells .cell.done { background: var(--ok); border-color: var(--ok); }
+
+/* 사안 */
+.steps { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.steps li { display: grid; gap: 6px; padding: 10px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.steps .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* 누가기록 · 행발 */
+.nuga-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.nuga-list li { border-top: 1px solid var(--line); padding-top: 10px; }
+.nuga-list li:first-child { border-top: none; padding-top: 0; }
+.nuga-list .row, .behavior-edit .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.behavior { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; margin-bottom: 12px; }
+.behavior-ref { background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px; max-height: 60vh; overflow-y: auto; }
+.behavior-ref h4 { margin: 0 0 8px; }
+.ref-list { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
+.ref-list p { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; }
+.behavior-edit textarea { width: 100%; font-size: 15px; line-height: 1.6; }
+
+/* 자리 배치 */
+.classroom { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; overflow-x: auto; }
+.board { text-align: center; padding: 8px; margin-bottom: 14px; border-radius: 8px; background: #2f4f3a; color: #fff; font-weight: 600; }
+.seat-grid { display: grid; gap: 8px 4px; min-width: 520px; }
+.seat {
+  display: grid; justify-items: center; gap: 0; padding: 10px 4px; min-height: 58px; border-radius: 10px;
+  background: var(--surface-2); border: 1.5px solid transparent; font-weight: 600;
+}
+.seat .num { font-size: 11px; color: var(--muted); font-weight: 500; }
+.seat.empty { background: transparent; border: 1.5px dashed var(--line); font-weight: 400; }
+.seat.picked { border-color: var(--primary); background: var(--primary-soft); }
+.seat.front { box-shadow: inset 0 -3px 0 var(--primary); }
+.seat.repeat { border-color: #e8710a; }
+.print-actions { gap: 8px; }
+
+/* 학생 페이지 추가 */
+.minor-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.heads-up { list-style: none; margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--warn-bg); display: grid; gap: 4px; font-size: 14px; }
+.heads-up .link { color: var(--warn-text); font-weight: 600; }
+.record.planned { border: 1.5px dashed color-mix(in srgb, #e8710a 50%, transparent); }
+a.record-main { text-decoration: none; color: inherit; }
+.student-page.privacy .private { color: transparent; text-shadow: 0 0 9px rgba(0, 0, 0, 0.45); user-select: none; }
+.seg.scroll { overflow-x: auto; max-width: 100%; }
+.seg.scroll button { white-space: nowrap; }
+.summary-cards { grid-template-columns: 2fr repeat(5, minmax(0, 1fr)); }
+
+/* 오늘: 챙길 일 */
+.todo-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; }
+.todo-list li { border-radius: 8px; }
+.todo-list li.over .detail { color: var(--danger); }
+.todo-list .row-btn { text-decoration: none; color: inherit; }
+.todo-list .follow-up { margin: 0; padding: 6px 8px; color: var(--text); }
+.todo-list .who { font-weight: 700; }
+
+/* 더보기 묶음 */
+.more-menu { display: grid; gap: 6px; }
+.more-menu ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.more-menu .section-title { color: var(--muted); font-size: 13px; margin: 10px 4px 2px; }
+
+@media (max-width: 960px) {
+  .summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .behavior { grid-template-columns: 1fr; }
+  .behavior-ref { max-height: 240px; }
+}
+
+/* ───────── 인쇄 ───────── */
+.print-root { display: none; }
+@media print {
+  body.printing > *:not(.print-root) { display: none !important; }
+  body.printing { background: #fff; }
+  body.printing .print-root { display: block; }
+}
+.print-doc { font-family: 'Malgun Gothic', sans-serif; color: #000; font-size: 11pt; }
+.print-doc h1 { font-size: 16pt; margin: 0 0 10px; }
+.print-doc h1 small { font-size: 10pt; font-weight: 400; color: #444; margin-left: 8px; }
+.print-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.print-table th, .print-table td { border: 1px solid #555; padding: 5px 7px; text-align: left; vertical-align: top; }
+.print-table th { background: #eee; }
+.print-table.meta th { width: 14%; }
+.print-doc .pre { white-space: pre-wrap; }
+.print-sign { margin-top: 18px; text-align: right; color: #333; }
+.print-board { text-align: center; border: 2px solid #000; padding: 6px; font-weight: 700; margin: 10px auto; width: 40%; }
+.print-seats { width: 100%; border-collapse: separate; border-spacing: 4px 8px; table-layout: fixed; }
+.print-seats td { border: 1.5px solid #000; height: 18mm; text-align: center; font-size: 15pt; font-weight: 700; }
+.print-seats td:empty { border-style: dashed; border-color: #aaa; }
+.print-seats td.aisle { border-right-width: 4px; }
+.print-seats .num { display: block; font-size: 8pt; font-weight: 400; color: #555; }
+.seat-print.student .print-seats td { font-size: 20pt; height: 24mm; }
+
+@media (min-width: 641px) and (max-width: 960px) {
+  .summary-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (hover: hover) {
+  .student-btn.got:hover:not(:disabled) { background: var(--ok-soft); border-color: var(--ok); }
+}
+
+@media (max-width: 640px) {
+  .seat-grid { min-width: 0; gap: 6px 2px; }
+  .seat { padding: 8px 2px; min-height: 50px; font-size: 13px; }
+  .classroom { padding: 10px; }
+}

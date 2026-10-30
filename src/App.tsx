@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
+import { BehaviorView } from './components/BehaviorView';
+import { ChecklistView } from './components/ChecklistView';
 import { Dashboard } from './components/Dashboard';
+import { IncidentsView } from './components/IncidentsView';
+import { NuggaView } from './components/NuggaView';
+import { PilsaView } from './components/PilsaView';
+import { SeatingView } from './components/SeatingView';
 import { Icon, type IconName } from './components/icons';
 import { RecordList } from './components/RecordList';
 import { SettingsView } from './components/SettingsView';
@@ -14,12 +20,39 @@ const TABS: readonly { id: 'today' | 'students' | 'more'; label: string; icon: I
   { id: 'more', label: '더보기', icon: 'grid' },
 ];
 
-/** «더보기» 안의 화면 */
-const MORE: readonly { id: 'records' | 'stats' | 'settings'; label: string; desc: string; icon: IconName }[] = [
-  { id: 'records', label: '출결 기록', desc: '목록·달력으로 출결 보기, 나이스 파일', icon: 'list' },
-  { id: 'stats', label: '출결 통계', desc: '학생별 결석일수, 체험학습 일수, 엑셀 내보내기', icon: 'chart' },
-  { id: 'settings', label: '설정', desc: '학생 명단, 휴일, 백업, 다른 기기와 맞추기', icon: 'gear' },
+type MoreId = 'checklists' | 'pilsa' | 'incidents' | 'seating' | 'behavior' | 'nuga' | 'records' | 'stats' | 'settings';
+
+/** «더보기» 안의 화면, 묶음별로 */
+const MORE_GROUPS: readonly { title: string; items: readonly { id: MoreId; label: string; desc: string; icon: IconName }[] }[] = [
+  {
+    title: '학급',
+    items: [
+      { id: 'checklists', label: '제출물 체크', desc: '동의서·가정통신문 회신 걷기, 안 낸 학생 복사', icon: 'check' },
+      { id: 'pilsa', label: '명심보감 필사', desc: '필사 부여, 장마다 낸 것 체크', icon: 'doc' },
+      { id: 'incidents', label: '사안 관리', desc: '다툼 등 학급 사안의 경과 기록, 인쇄', icon: 'alert' },
+      { id: 'seating', label: '자리 배치', desc: '조건 지켜 섞기, 교탁용·게시용 인쇄', icon: 'grid' },
+    ],
+  },
+  {
+    title: '나이스 · 생기부',
+    items: [
+      { id: 'nuga', label: '나이스 누가기록', desc: '관찰·상담 기록을 복사해 누가기록에 넣기', icon: 'upload' },
+      { id: 'behavior', label: '행발 쓰기', desc: '1년 기록을 보며 행동특성 및 종합의견 쓰기', icon: 'pen' },
+    ],
+  },
+  {
+    title: '출결',
+    items: [
+      { id: 'records', label: '출결 기록', desc: '목록·달력으로 출결 보기, 나이스 파일', icon: 'list' },
+      { id: 'stats', label: '출결 통계', desc: '학생별 결석일수, 체험학습 일수, 엑셀·구글 시트', icon: 'chart' },
+    ],
+  },
+  {
+    title: '설정',
+    items: [{ id: 'settings', label: '설정', desc: '학생 명단, 휴일, 백업, 구글 연결', icon: 'gear' }],
+  },
 ];
+const MORE = MORE_GROUPS.flatMap((g) => g.items);
 
 type Page = (typeof TABS)[number]['id'] | (typeof MORE)[number]['id'];
 
@@ -89,6 +122,12 @@ function Shell() {
         {page === 'more' && <MoreMenu needBackup={needBackup} />}
         {page === 'records' && <RecordList initialView={location.hash === '#calendar' ? 'calendar' : 'list'} />}
         {page === 'stats' && <Dashboard />}
+        {page === 'checklists' && <ChecklistView />}
+        {page === 'pilsa' && <PilsaView />}
+        {page === 'incidents' && <IncidentsView />}
+        {page === 'seating' && <SeatingView />}
+        {page === 'nuga' && <NuggaView />}
+        {page === 'behavior' && <BehaviorView />}
         {page === 'settings' && <SettingsView />}
       </main>
     </div>
@@ -97,21 +136,28 @@ function Shell() {
 
 function MoreMenu({ needBackup }: { needBackup: boolean }) {
   return (
-    <ul className="more-menu">
-      {MORE.map((m) => (
-        <li key={m.id}>
-          <a href={`#${m.id}`} className="more-item">
-            <Icon name={m.icon} size={22} />
-            <span>
-              <b>{m.label}</b>
-              <span className="muted">{m.desc}</span>
-            </span>
-            {m.id === 'settings' && needBackup && <span className="count-badge">백업</span>}
-            <Icon name="right" />
-          </a>
-        </li>
+    <div className="more-menu">
+      {MORE_GROUPS.map((g) => (
+        <section key={g.title}>
+          <h3 className="section-title">{g.title}</h3>
+          <ul>
+            {g.items.map((m) => (
+              <li key={m.id}>
+                <a href={`#${m.id}`} className="more-item">
+                  <Icon name={m.icon} size={22} />
+                  <span>
+                    <b>{m.label}</b>
+                    <span className="muted">{m.desc}</span>
+                  </span>
+                  {m.id === 'settings' && needBackup && <span className="count-badge">백업</span>}
+                  <Icon name="right" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }
 

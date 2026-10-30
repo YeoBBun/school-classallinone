@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
+import { GoogleSettings } from './GoogleSettings';
 import { SyncSettings } from './SyncSettings';
 import { formatKo, indexHolidays } from '../domain/calendar';
 import { rebuildDocs } from '../domain/rules';
 import { mergePublicHolidays } from '../domain/publicHolidays';
+import { removeStudentData, studentDataCount } from '../domain/student';
 import type { DeadlineBasis, HolidayType, Settings, Student } from '../domain/types';
 import { emptyState } from '../domain/types';
 import { exportBackup, normalize } from '../storage/db';
@@ -34,6 +36,7 @@ export function SettingsView() {
       {needBackup && <BackupSettings />}
       <ClassSettings />
       <RosterSettings />
+      <GoogleSettings />
       <HolidaySettings />
       <ExamSettings />
       <RuleSettings />
@@ -80,20 +83,10 @@ function RosterSettings() {
     update((s) => ({ ...s, students: s.students.map((st) => (st.id === id ? { ...st, ...patch } : st)) }));
 
   const remove = (st: Student) => {
-    const count = state.records.filter((r) => r.studentId === st.id).length;
-    const noteCount = state.notes.filter((n) => n.studentIds.includes(st.id)).length;
-    const parts = [count && `출결 기록 ${count}건`, noteCount && `관찰·상담 기록 ${noteCount}건`].filter(Boolean);
-    const msg = parts.length ? `${st.name} 학생과 ${parts.join(', ')}을 모두 삭제할까요?` : `${st.name} 학생을 삭제할까요?`;
+    const count = studentDataCount(state, st.id);
+    const msg = count ? `${st.name} 학생과 이 학생에 대한 기록 ${count}건을 모두 삭제할까요?` : `${st.name} 학생을 삭제할까요?`;
     if (!confirm(msg)) return;
-    update((s) => ({
-      ...s,
-      students: s.students.filter((x) => x.id !== st.id),
-      records: s.records.filter((r) => r.studentId !== st.id),
-      // 여러 학생이 같이 있는 기록은 그 학생만 빼고 남긴다
-      notes: s.notes
-        .map((n) => (n.studentIds.includes(st.id) ? { ...n, studentIds: n.studentIds.filter((id) => id !== st.id) } : n))
-        .filter((n) => n.studentIds.length > 0),
-    }));
+    update((s) => removeStudentData(s, st.id));
   };
 
   return (

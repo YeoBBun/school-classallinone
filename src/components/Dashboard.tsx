@@ -7,6 +7,7 @@ import { useStore } from '../store';
 import { KIND_SHORT, Modal, sortStudents } from './common';
 import { RecordForm } from './RecordForm';
 import { RecordItem } from './RecordItem';
+import { SheetButton } from './GoogleButtons';
 import type { AttendanceRecord } from '../domain/types';
 
 const MONTHS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2];
@@ -68,6 +69,7 @@ export function Dashboard() {
         </label>
         <span className="spacer" />
         <button onClick={() => exportCsv(rows, `${year}${month === 'all' ? '' : `_${String(month).padStart(2, '0')}`}`)}>엑셀(CSV) 내보내기</button>
+        <SheetButton title={`출결 통계 ${year}${month === 'all' ? '학년도' : ` ${month}월`}`} rows={() => summaryRows(rows)} />
       </div>
 
       <div className="kpis">
@@ -246,7 +248,7 @@ function StudentDetail({ studentId, from, to, onClose }: { studentId: string; fr
   );
 }
 
-function exportCsv(rows: StudentSummary[], label: string) {
+function summaryRows(rows: StudentSummary[]): string[][] {
   const header = [
     '번호',
     '이름',
@@ -273,7 +275,11 @@ function exportCsv(rows: StudentSummary[], label: string) {
     r.missingDocCount,
     r.warningCount,
   ]);
-  const csv = [header, ...lines].map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  return [header, ...lines].map((l) => l.map(String));
+}
+
+function exportCsv(rows: StudentSummary[], label: string) {
+  const csv = summaryRows(rows).map((l) => l.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   // BOM 을 붙여야 엑셀에서 한글이 깨지지 않는다.
   downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `attendance_summary_${label}.csv`);
 }

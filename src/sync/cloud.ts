@@ -1,20 +1,35 @@
 /**
- * 휴대폰 ↔ PC 출결 앱 동기화 (깃허브 비공개 저장소 경유)
+ * 기기 간 동기화 (구글 드라이브 또는 깃허브 비공개 저장소 경유)
  *
  * 앱 데이터 전체를 선생님이 정한 잠금 비밀번호로 잠가(gzip → PBKDF2-SHA256 → AES-256-GCM)
- * 저장소의 sync/state.json 하나에 둔다. 각 기기는 받아서 합치고(merge.ts), 달라졌으면 다시 올린다.
+ * 파일 하나에 둔다 (드라이브: 내 드라이브 '학급관리' 폴더의 class-state.json, 깃허브: sync/state.json).
+ * 각 기기는 받아서 합치고(merge.ts), 달라졌으면 다시 올린다.
  * 연동 설정(토큰·비밀번호)은 이 기기에만 저장하고 백업 파일에는 넣지 않는다.
  */
 import type { AppState } from '../domain/types';
+import * as google from '../google/google';
 import { normalize } from '../storage/db';
 import { canonical, mergeStates } from './merge';
 
-export interface SyncConfig {
+export interface GithubSyncConfig {
+  kind?: 'github';
   /** 예: YeoBBun/school-attendance-sync */
   repo: string;
   token: string;
   passphrase: string;
 }
+
+/** 구글 드라이브: 로그인은 google.ts 가 맡고, 여기에는 잠금 비밀번호만 */
+export interface GoogleSyncConfig {
+  kind: 'google';
+  passphrase: string;
+}
+
+export type SyncConfig = GithubSyncConfig | GoogleSyncConfig;
+
+export const isGithub = (cfg: SyncConfig): cfg is GithubSyncConfig => cfg.kind !== 'google';
+
+const DRIVE_FILE = 'class-state.json';
 
 const CONFIG_KEY = 'neis-sync-config';
 const STATE_PATH = 'sync/state.json';
@@ -113,7 +128,7 @@ export async function decrypt(env: Envelope, passphrase: string): Promise<unknow
 
 // ─── 깃허브 ──────────────────────────────────────────────
 
-async function gh(cfg: SyncConfig, method: string, path: string, body?: unknown): Promise<Response> {
+async function gh(cfg: GithubSyncConfig, method: string, path: string, body?: unknown): Promise<Response> {
   return fetch(`${API}/repos/${cfg.repo}${path}`, {
     method,
     headers: {
@@ -127,7 +142,7 @@ async function gh(cfg: SyncConfig, method: string, path: string, body?: unknown)
 }
 
 /** 연결 확인. 문제가 없으면 null, 있으면 선생님께 보여줄 문장. */
-export async function testConnection(cfg: SyncConfig): Promise<string | null> {
+export async function testConnection(cfg: GithubSyncConfig): Promise<string | null> {
   try {
     const r = await gh(cfg, 'GET', '');
     if (r.status === 200) {
@@ -146,7 +161,7 @@ export async function testConnection(cfg: SyncConfig): Promise<string | null> {
 
 export class SyncError extends Error {}
 
-async function pull(cfg: SyncConfig): Promise<{ state: AppState; sha: string } | null> {
+async function pullGithub(cfg: GithubSyncConfig): Promise<Remote | null> {
   const r = await gh(cfg, 'GET', `/contents/${STATE_PATH}`);
   if (r.status === 404) return null;
   if (r.status === 401) throw new SyncError('토큰이 맞지 않거나 만료됐어요.');
@@ -168,7 +183,7 @@ async function pull(cfg: SyncConfig): Promise<{ state: AppState; sha: string } |
   return { state: normalize(plain), sha: data.sha };
 }
 
-async function push(cfg: SyncConfig, state: AppState, sha?: string): Promise<'ok' | 'conflict'> {
+async function pushGithub(cfg: GithubSyncConfig, state: AppState, sha?: string): Promise<'ok' | 'conflict'> {
   const body = { message: '동기화', content: btoa(JSON.stringify(await encrypt(state, cfg.passphrase))), ...(sha ? { sha } : {}) };
   const r = await gh(cfg, 'PUT', `/contents/${STATE_PATH}`, body);
   if (r.ok) return 'ok';
@@ -177,6 +192,64 @@ async function push(cfg: SyncConfig, state: AppState, sha?: string): Promise<'ok
   if (r.status === 403) throw new SyncError('올리기가 막혔어요 (토큰 권한 또는 학교망 차단).');
   throw new SyncError(`올리지 못했어요 (깃허브 ${r.status})`);
 }
+
+// ─── 구글 드라이브 ───────────────────────────────────────
+
+/** 드라이브 오류를 선생님께 보일 문장으로 */
+function driveError(e: unknown): never {
+  if (e instanceof google.AuthError) throw new SyncError(e.message);
+  if (e instanceof SyncError) throw e;
+  if (e instanceof google.GoogleError) throw new SyncError(`구글 드라이브 오류: ${e.message}`);
+  throw new SyncError('인터넷에 연결되지 않았거나 이 네트워크에서 구글이 막혀 있어요.');
+}
+
+async function pullDrive(cfg: GoogleSyncConfig): Promise<Remote | null> {
+  try {
+    const folder = await google.rootFolder();
+    const file = await google.findFile(DRIVE_FILE, folder);
+    if (!file) return null;
+    const env = (await google.readJson(file.id)) as Envelope;
+    let plain: unknown;
+    try {
+      plain = await decrypt(env, cfg.passphrase);
+    } catch {
+      throw new SyncError('잠금 비밀번호가 다른 기기와 달라요.');
+    }
+    return { state: normalize(plain), sha: file.version, fileId: file.id };
+  } catch (e) {
+    driveError(e);
+  }
+}
+
+/**
+ * 드라이브는 «바뀌지 않았으면 쓰기» 를 못 해서, 쓰기 직전에 버전을 다시 보고 그 사이 바뀌었으면 다시 받아 합친다.
+ * (그 짧은 틈에 두 기기가 동시에 쓰면 한쪽이 덮이지만, 다음 동기화 때 그 기기가 다시 합쳐 올린다.)
+ */
+async function pushDrive(cfg: GoogleSyncConfig, state: AppState, remote: Remote | null): Promise<'ok' | 'conflict'> {
+  try {
+    const folder = await google.rootFolder();
+    if (remote?.fileId) {
+      if ((await google.fileVersion(remote.fileId)) !== remote.sha) return 'conflict';
+    } else if (await google.findFile(DRIVE_FILE, folder)) {
+      return 'conflict'; // 다른 기기가 막 처음 만들었다
+    }
+    await google.writeJson({ fileId: remote?.fileId, name: DRIVE_FILE, parentId: folder, data: await encrypt(state, cfg.passphrase) });
+    return 'ok';
+  } catch (e) {
+    driveError(e);
+  }
+}
+
+interface Remote {
+  state: AppState;
+  /** 깃허브 sha 또는 드라이브 version */
+  sha: string;
+  fileId?: string;
+}
+
+const pull = (cfg: SyncConfig) => (isGithub(cfg) ? pullGithub(cfg) : pullDrive(cfg));
+const push = (cfg: SyncConfig, state: AppState, remote: Remote | null) =>
+  isGithub(cfg) ? pushGithub(cfg, state, remote?.sha) : pushDrive(cfg, state, remote);
 
 /**
  * 받아서 합치고, 달라졌으면 올린다. 합친 상태를 돌려준다 (로컬과 같으면 같은 객체).
@@ -189,7 +262,7 @@ export async function syncNow(cfg: SyncConfig, local: AppState): Promise<AppStat
     if (remote && canonical(merged) === canonical(remote.state)) {
       return canonical(merged) === canonical(local) ? local : merged;
     }
-    if ((await push(cfg, merged, remote?.sha)) === 'ok') return canonical(merged) === canonical(local) ? local : merged;
+    if ((await push(cfg, merged, remote)) === 'ok') return canonical(merged) === canonical(local) ? local : merged;
   }
   throw new SyncError('다른 기기와 동시에 고치는 중이에요. 잠시 뒤 다시 맞춥니다.');
 }
@@ -198,7 +271,7 @@ export async function syncNow(cfg: SyncConfig, local: AppState): Promise<AppStat
  * 휴대폰 위젯용 받을 서류 요약을 올린다. 이 기기가 지난번에 올린 것과 같으면 건너뛴다.
  * 다른 기기가 같은 내용을 먼저 올렸어도 덮어쓸 뿐이라 해가 없다.
  */
-export async function pushPending(cfg: SyncConfig, summary: unknown): Promise<void> {
+export async function pushPending(cfg: GithubSyncConfig, summary: unknown): Promise<void> {
   const text = JSON.stringify(summary);
   const sent = `${cfg.repo}\n${text}`;
   try {

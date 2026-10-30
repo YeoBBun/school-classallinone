@@ -1,0 +1,360 @@
+/**
+ * 구글 로그인(Google Identity Services)과 드라이브·캘린더 API.
+ *
+ * 권한은 좁게: drive.file (이 앱이 만든 파일·폴더만), calendar.app.created (이 앱이 만든 캘린더와 그 일정만).
+ * 서버 없이 브라우저에서 바로 부르므로 로그인은 1시간쯤 뒤 끝나고, 그때는 [다시 연결]을 눌러야 한다.
+ */
+import { GOOGLE_CLIENT_ID } from './config';
+
+const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file';
+const SCOPE_CAL = 'https://www.googleapis.com/auth/calendar.app.created';
+const SCOPES = `${SCOPE_DRIVE} ${SCOPE_CAL} email`;
+const DRIVE = 'https://www.googleapis.com/drive/v3';
+const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+const CAL = 'https://www.googleapis.com/calendar/v3';
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const TOKEN_KEY = 'class-google-token';
+/** 내 드라이브에 만드는 폴더 */
+export const ROOT_FOLDER = '학급관리';
+
+export const isConfigured = /\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID.trim());
+
+export class AuthError extends Error {
+  constructor(message = '구글 연결이 끝났어요. [다시 연결]을 눌러 주세요.') {
+    super(message);
+  }
+}
+
+export class GoogleError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+interface Token {
+  access_token: string;
+  expires_at: number;
+  scope: string;
+  email?: string;
+}
+
+let token: Token | null = null;
+const listeners = new Set<() => void>();
+
+function changed() {
+  for (const fn of listeners) fn();
+}
+
+/** 연결 상태가 바뀌면 부른다. 해제 함수를 돌려준다 */
+export function onGoogleChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function saveToken() {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* 저장 공간을 못 쓰는 환경 */
+  }
+  changed();
+}
+
+// 남은 토큰부터 읽어 둔다 (스크립트를 못 받아도 드라이브는 쓸 수 있게)
+try {
+  const t = JSON.parse(localStorage.getItem(TOKEN_KEY) ?? 'null') as Token | null;
+  if (t && t.expires_at > Date.now() + 60_000) token = t;
+} catch {
+  /* 무시 */
+}
+
+export const hasToken = () => !!token && token.expires_at > Date.now() + 30_000;
+export const hasCalendarScope = () => hasToken() && token!.scope.includes(SCOPE_CAL);
+export const googleEmail = () => token?.email ?? '';
+
+/** 한 번이라도 연결한 적 있는가 (끝난 연결 포함) — «다시 연결» 안내에 쓴다 */
+export function wasConnected(): boolean {
+  try {
+    return !!localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return false;
+  }
+}
+
+interface GsiTokenResponse {
+  access_token: string;
+  expires_in: string | number;
+  scope?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface Gsi {
+  accounts: {
+    oauth2: {
+      initTokenClient(cfg: {
+        client_id: string;
+        scope: string;
+        prompt: string;
+        include_granted_scopes: boolean;
+        callback: (r: GsiTokenResponse) => void;
+        error_callback: (e: { type?: string; message?: string }) => void;
+      }): { requestAccessToken(): void };
+      hasGrantedAllScopes(r: GsiTokenResponse, scope: string): boolean;
+      revoke(token: string, done: () => void): void;
+    };
+  };
+}
+
+const gsi = () => (window as unknown as { google?: Gsi }).google;
+
+function loadScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (gsi()?.accounts?.oauth2) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('구글 로그인 창을 불러오지 못했어요. 인터넷 연결이나 학교망 차단을 확인해 주세요.'));
+    document.head.append(s);
+  });
+}
+
+/** 미리 불러 두면 버튼을 눌렀을 때 팝업이 막히지 않는다 */
+export function preloadGoogle(): void {
+  if (isConfigured) void loadScript().catch(() => {});
+}
+
+/** 반드시 버튼 클릭 안에서 부른다 (팝업 차단) */
+export async function signIn(): Promise<void> {
+  await loadScript();
+  const g = gsi()!;
+  await new Promise<void>((resolve, reject) => {
+    const client = g.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID.trim(),
+      scope: SCOPES,
+      prompt: '',
+      include_granted_scopes: true,
+      callback: (r) => {
+        if (r.error) return reject(new Error(r.error_description || r.error));
+        if (!g.accounts.oauth2.hasGrantedAllScopes(r, SCOPE_DRIVE)) {
+          return reject(new Error("구글 드라이브 권한이 필요해요. 로그인 창에서 '드라이브' 항목에 체크해 주세요."));
+        }
+        token = { access_token: r.access_token, expires_at: Date.now() + Number(r.expires_in) * 1000, scope: r.scope ?? '', email: token?.email };
+        resolve();
+      },
+      error_callback: (e) =>
+        reject(
+          new Error(
+            e?.type === 'popup_closed'
+              ? '로그인 창이 닫혔어요.'
+              : e?.type === 'popup_failed_to_open'
+                ? '팝업이 막혔어요. 브라우저 주소창 옆에서 팝업을 허용해 주세요.'
+                : e?.message || '구글 로그인에 실패했어요.',
+          ),
+        ),
+    });
+    client.requestAccessToken();
+  });
+  try {
+    const r = await api('https://www.googleapis.com/oauth2/v3/userinfo');
+    token!.email = ((await r.json()) as { email?: string }).email ?? '';
+  } catch {
+    /* 이메일은 표시용이라 없어도 된다 */
+  }
+  saveToken();
+}
+
+export function signOut(): void {
+  if (token) {
+    try {
+      gsi()?.accounts.oauth2.revoke(token.access_token, () => {});
+    } catch {
+      /* 무시 */
+    }
+  }
+  token = null;
+  try {
+    localStorage.removeItem(FOLDER_KEY);
+  } catch {
+    /* 무시 */
+  }
+  saveToken();
+}
+
+async function api(url: string, init: RequestInit = {}): Promise<Response> {
+  if (!hasToken()) throw new AuthError();
+  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token!.access_token}`, ...(init.headers ?? {}) }, cache: 'no-store' });
+  if (res.status === 401) {
+    token = { ...token!, expires_at: 0 };
+    saveToken();
+    throw new AuthError();
+  }
+  if (!res.ok) {
+    let msg = `구글 ${url.startsWith(CAL) ? '캘린더' : '드라이브'} 오류 (${res.status})`;
+    try {
+      msg = ((await res.json()) as { error?: { message?: string } }).error?.message || msg;
+    } catch {
+      /* 무시 */
+    }
+    throw new GoogleError(msg, res.status);
+  }
+  return res;
+}
+
+// ─── 드라이브 ───
+
+const FOLDER_KEY = 'class-google-folder';
+const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+async function findOne(query: string): Promise<{ id: string; version: string } | null> {
+  const r = await api(`${DRIVE}/files?q=${encodeURIComponent(query)}&fields=files(id,version)&spaces=drive&pageSize=5&orderBy=createdTime`);
+  return ((await r.json()) as { files: { id: string; version: string }[] }).files[0] ?? null;
+}
+
+/** 내 드라이브의 '학급관리' 폴더 (없으면 만든다) */
+export async function rootFolder(): Promise<string> {
+  try {
+    const cached = localStorage.getItem(FOLDER_KEY);
+    if (cached) return cached;
+  } catch {
+    /* 무시 */
+  }
+  const found = await findOne(`name='${q(ROOT_FOLDER)}' and mimeType='${FOLDER_MIME}' and trashed=false`);
+  const id =
+    found?.id ??
+    ((await (
+      await api(`${DRIVE}/files?fields=id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: ROOT_FOLDER, mimeType: FOLDER_MIME }),
+      })
+    ).json()) as { id: string }).id;
+  try {
+    localStorage.setItem(FOLDER_KEY, id);
+  } catch {
+    /* 무시 */
+  }
+  return id;
+}
+
+export async function findFile(name: string, parentId: string) {
+  return findOne(`name='${q(name)}' and '${q(parentId)}' in parents and trashed=false`);
+}
+
+export async function fileVersion(fileId: string): Promise<string> {
+  const r = await api(`${DRIVE}/files/${fileId}?fields=version,trashed`);
+  return ((await r.json()) as { version: string }).version;
+}
+
+export async function readJson(fileId: string): Promise<unknown> {
+  return (await api(`${DRIVE}/files/${fileId}?alt=media`)).json();
+}
+
+function multipart(meta: object, body: Blob | string, type: string): { headers: Record<string, string>; body: Blob } {
+  const boundary = `class${Math.random().toString(36).slice(2)}`;
+  return {
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body: new Blob([
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n`,
+      `--${boundary}\r\nContent-Type: ${type}\r\n\r\n`,
+      body,
+      `\r\n--${boundary}--`,
+    ]),
+  };
+}
+
+/** JSON 파일 만들기(fileId 없음) 또는 덮어쓰기 */
+export async function writeJson(opts: { fileId?: string; name: string; parentId: string; data: unknown }): Promise<{ id: string; version: string }> {
+  const meta = opts.fileId ? {} : { name: opts.name, parents: [opts.parentId], mimeType: 'application/json' };
+  const part = multipart(meta, JSON.stringify(opts.data), 'application/json; charset=UTF-8');
+  const url = opts.fileId ? `${UPLOAD}/files/${opts.fileId}?uploadType=multipart&fields=id,version` : `${UPLOAD}/files?uploadType=multipart&fields=id,version`;
+  const r = await api(url, { method: opts.fileId ? 'PATCH' : 'POST', ...part });
+  return (await r.json()) as { id: string; version: string };
+}
+
+/** 표(행 배열)를 구글 시트로 만들고 주소를 돌려준다 */
+export async function createSheet(title: string, rows: string[][]): Promise<string> {
+  const csv = '﻿' + rows.map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(',')).join('\n');
+  const meta = { name: title, parents: [await rootFolder()], mimeType: 'application/vnd.google-apps.spreadsheet' };
+  const part = multipart(meta, csv, 'text/csv; charset=UTF-8');
+  const r = await api(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', ...part });
+  const { id } = (await r.json()) as { id: string };
+  return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+}
+
+// ─── 캘린더 ───
+
+export async function createCalendar(summary: string): Promise<string> {
+  const r = await api(`${CAL}/calendars`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ summary, timeZone: 'Asia/Seoul' }),
+  });
+  return ((await r.json()) as { id: string }).id;
+}
+
+/** 캘린더가 아직 있는가 (지웠으면 다시 만든다) */
+export async function calendarExists(id: string): Promise<boolean> {
+  try {
+    await api(`${CAL}/calendars/${encodeURIComponent(id)}`);
+    return true;
+  } catch (e) {
+    if (e instanceof GoogleError && (e.status === 404 || e.status === 403)) return false;
+    throw e;
+  }
+}
+
+function nextDay(d: string): string {
+  const t = new Date(`${d}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + 1);
+  return t.toISOString().slice(0, 10);
+}
+
+function addMinutes(date: string, time: string, minutes: number): string {
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  const day = total >= 24 * 60 ? nextDay(date) : date;
+  const t = total % (24 * 60);
+  return `${day}T${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}:00`;
+}
+
+export interface EventInput {
+  summary: string;
+  date: string;
+  time?: string;
+  minutes?: number;
+  description?: string;
+}
+
+/** 일정 만들기(eventId 없음) 또는 고치기. 일정 id 를 돌려준다 */
+export async function saveEvent(calendarId: string, eventId: string | null, e: EventInput): Promise<string> {
+  const when = e.time
+    ? {
+        start: { dateTime: `${e.date}T${e.time}:00`, timeZone: 'Asia/Seoul' },
+        end: { dateTime: addMinutes(e.date, e.time, e.minutes ?? 30), timeZone: 'Asia/Seoul' },
+      }
+    : { start: { date: e.date }, end: { date: nextDay(e.date) } };
+  const body = JSON.stringify({ summary: e.summary, description: e.description ?? '', ...when });
+  const base = `${CAL}/calendars/${encodeURIComponent(calendarId)}/events`;
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const r = eventId
+      ? await api(`${base}/${encodeURIComponent(eventId)}`, { method: 'PUT', headers, body })
+      : await api(base, { method: 'POST', headers, body });
+    return ((await r.json()) as { id: string }).id;
+  } catch (err) {
+    // 캘린더에서 직접 지운 일정이면 새로 만든다
+    if (eventId && err instanceof GoogleError && (err.status === 404 || err.status === 410)) return saveEvent(calendarId, null, e);
+    throw err;
+  }
+}
+
+export async function deleteEvent(calendarId: string, eventId: string): Promise<void> {
+  try {
+    await api(`${CAL}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { method: 'DELETE' });
+  } catch (err) {
+    if (!(err instanceof GoogleError && (err.status === 404 || err.status === 410))) throw err;
+  }
+}

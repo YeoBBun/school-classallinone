@@ -5,7 +5,9 @@ import type { AppState, AttendanceRecord, Note } from './domain/types';
 import { androidApp } from './platform/android';
 import { loadState, requestPersistence, saveState } from './storage/db';
 import { widgetSummary } from './domain/pending';
-import { loadSyncConfig, pushPending, syncNow } from './sync/cloud';
+import { applyCalendar } from './google/calendarSync';
+import { onGoogleChange } from './google/google';
+import { isGithub, loadSyncConfig, pushPending, syncNow } from './sync/cloud';
 import { mergeStates, stamp } from './sync/merge';
 
 interface Store {
@@ -27,6 +29,8 @@ interface Store {
   syncNow: () => void;
   /** 휴대폰 위젯용 받을 서류 요약을 올린 결과 */
   widgetSync: WidgetSyncStatus;
+  /** 구글 캘린더에 일정을 맞춘 결과 */
+  calendar: WidgetSyncStatus;
 }
 
 export type WidgetSyncStatus = { kind: 'none' } | { kind: 'ok'; at: string } | { kind: 'error'; message: string };
@@ -109,11 +113,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const again = useRef(false);
   const [widgetSync, setWidgetSync] = useState<WidgetSyncStatus>({ kind: 'none' });
 
+  // ─── 구글 캘린더 ───
+  const [calendar, setCalendar] = useState<WidgetSyncStatus>({ kind: 'none' });
+  const calBusy = useRef(false);
+  const runCalendar = useCallback(async () => {
+    const s = stateRef.current;
+    if (!s?.settings.calendarOn || calBusy.current) return;
+    calBusy.current = true;
+    try {
+      const r = await applyCalendar(s);
+      if (r) {
+        commit((cur) => ({
+          ...cur,
+          calendarLinks: r.links,
+          settings: r.calendarId !== cur.settings.calendarId ? { ...cur.settings, calendarId: r.calendarId } : cur.settings,
+        }));
+      }
+      setCalendar({ kind: 'ok', at: new Date().toISOString() });
+    } catch (e) {
+      setCalendar({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      calBusy.current = false;
+    }
+  }, [commit]);
+
   const runSync = useCallback(async () => {
     const cfg = loadSyncConfig();
     // 휴대폰 '출결' 앱 안이면 위젯도 같은 설정을 쓰게 넘긴다 (바뀌었을 때만 앱이 반영)
-    androidApp()?.setSyncConfig?.(cfg ? JSON.stringify(cfg) : '');
-    if (!cfg) return setSync({ kind: 'off' });
+    // (위젯은 깃허브 동기화에서만 쓸 수 있다)
+    androidApp()?.setSyncConfig?.(cfg && isGithub(cfg) ? JSON.stringify(cfg) : '');
+    if (!cfg) {
+      setSync({ kind: 'off' });
+      return runCalendar();
+    }
     if (syncing.current) {
       again.current = true;
       return;
@@ -130,10 +162,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       if (stateRef.current !== base) again.current = true;
       setSync({ kind: 'ok', at: new Date().toISOString() });
+      // 다른 기기가 넣은 일정까지 받은 뒤에 캘린더를 맞춘다 (같은 일정을 두 번 넣지 않게)
+      setTimeout(() => void runCalendar(), 300);
       // 휴대폰 위젯용 요약 — 실패해도 출결 동기화는 된 것이라 다음 동기화 때 다시 올린다
-      pushPending(cfg, widgetSummary(merged, indexHolidays(merged.holidays)))
-        .then(() => setWidgetSync({ kind: 'ok', at: new Date().toISOString() }))
-        .catch((e) => setWidgetSync({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
+      if (isGithub(cfg))
+        pushPending(cfg, widgetSummary(merged, indexHolidays(merged.holidays)))
+          .then(() => setWidgetSync({ kind: 'ok', at: new Date().toISOString() }))
+          .catch((e) => setWidgetSync({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
     } catch (e) {
       setSync((s) => ({ kind: 'error', message: e instanceof Error ? e.message : String(e), at: 'at' in s ? s.at : undefined }));
     } finally {
@@ -143,7 +178,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setTimeout(() => void runSync(), 500);
       }
     }
-  }, []);
+  }, [runCalendar]);
+
+  // 구글에 (다시) 연결되면 바로 맞춘다
+  useEffect(() => onGoogleChange(() => void runSync()), [runSync]);
 
   // 이 기기에서 고치면 잠시 뒤 올린다
   useEffect(() => {
@@ -211,7 +249,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   if (!state) return <div className="fatal">불러오는 중…</div>;
 
   return (
-    <StoreContext.Provider value={{ state, update, replace, holidays, docContext, warnings, saveError, removeRecord, removeNote, sync, syncNow: () => void runSync(), widgetSync }}>
+    <StoreContext.Provider value={{ state, update, replace, holidays, docContext, warnings, saveError, removeRecord, removeNote, sync, syncNow: () => void runSync(), widgetSync, calendar }}>
       {children}
       {undo && (
         <div className="toast" role="status">

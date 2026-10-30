@@ -20,6 +20,7 @@ import { Icon } from './icons';
 import { NeisExport } from './NeisExport';
 import { clean, RecordForm } from './RecordForm';
 import { RecordItem } from './RecordItem';
+import { TodoCard } from './TodoCard';
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7];
@@ -104,6 +105,7 @@ export function Today() {
 
           <aside className="today-side">
             <DaySummary date={date} records={todays} onOpen={setEntryFor} />
+            <TodoCard />
             <div className="quick-actions">
               <button className="tile-btn" onClick={() => setIntake(true)}>
                 <Icon name="plane" size={20} />

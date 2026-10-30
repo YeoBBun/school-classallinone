@@ -122,6 +122,97 @@ export interface Note extends Stamped {
   /** 학부모상담일 때만: 상담한 보호자 (어머니, 아버지 등) */
   parentWho?: string;
   parentMethod?: ParentMethod;
+  /** 아직 하지 않은 상담 (일정). 내용을 적어 저장하면 끝난 상담이 된다 */
+  planned?: boolean;
+  /** 상담 시각 'HH:MM' (일정일 때) */
+  time?: string;
+  /** 나이스 누가기록에 옮겨 적었는가 */
+  neisDone?: boolean;
+}
+
+/** 제출물·회신 체크 (가정통신문 회신, 동의서 등) */
+export interface Checklist extends Stamped {
+  id: string;
+  title: string;
+  createdAt: DateStr;
+  dueDate?: DateStr;
+  /** 학생id → 낸 날짜. 면제는 'exempt' */
+  marks: Record<string, DateStr | 'exempt'>;
+  /** 다 받아서 치워 둔 항목 */
+  closed?: boolean;
+}
+
+/** 명심보감 필사 부여 한 번. 낸 장은 앞에서부터 채운다 */
+export interface PilsaTask extends Stamped {
+  id: string;
+  studentId: string;
+  date: DateStr;
+  reason: string;
+  pages: number;
+  /** 낸 장마다 낸 날짜 (길이 ≤ pages) */
+  submitted: DateStr[];
+}
+
+export const INCIDENT_STATUSES = ['진행 중', '관찰 중', '종결'] as const;
+export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
+export const INCIDENT_STEP_KINDS = ['인지', '학생 면담', '보호자 연락', '조치', '기타'] as const;
+export type IncidentStepKind = (typeof INCIDENT_STEP_KINDS)[number];
+
+export interface IncidentStep {
+  id: string;
+  date: DateStr;
+  kind: IncidentStepKind;
+  text: string;
+}
+
+/** 학급 내 사안 (다툼, 분실 등). 사실 위주로 경과를 적는다 */
+export interface Incident extends Stamped {
+  id: string;
+  title: string;
+  date: DateStr;
+  studentIds: string[];
+  status: IncidentStatus;
+  steps: IncidentStep[];
+  /** 학교폭력으로 이어질 수 있어 따로 챙길 사안 */
+  violence?: boolean;
+}
+
+/** 자리 배치 한 번. seats 는 교탁 쪽 첫 줄 왼쪽(학생이 칠판을 볼 때)부터 줄마다 */
+export interface SeatPlan extends Stamped {
+  id: string;
+  date: DateStr;
+  rows: number;
+  cols: number;
+  /** 두 자리씩 붙여 앉는가 (짝) */
+  pair: boolean;
+  seats: (string | null)[];
+}
+
+/** 행동특성 및 종합의견 초안. id 는 '학년도:학생id' */
+export interface BehaviorDraft extends Stamped {
+  id: string;
+  studentId: string;
+  year: number;
+  text: string;
+  done?: boolean;
+}
+
+/** 구글 캘린더에 넣은 일정. id 는 그 일정을 만든 항목 ('note:id', 'due:id') */
+export interface CalendarLink extends Stamped {
+  id: string;
+  eventId: string;
+  /** 일정 내용 요약 — 바뀌었을 때만 다시 올린다 */
+  hash: string;
+}
+
+export interface SeatingRules {
+  rows: number;
+  cols: number;
+  pair: boolean;
+  /** 앞쪽 두 줄에 앉힐 학생 */
+  front: string[];
+  /** 서로 붙지 않게 할 두 학생 */
+  apart: [string, string][];
 }
 
 export type DeadlineBasis = 'school' | 'calendar';
@@ -143,6 +234,15 @@ export interface Settings extends Stamped {
   lastBackupAt?: string;
   /** 마지막으로 나이스 파일을 내보낸 기간의 끝 날짜 */
   lastNeisExportTo?: DateStr;
+  /** 필사 1회 기본 분량(장)과 부여할 때마다 늘어나는 분량 */
+  pilsaBase: number;
+  pilsaStep: number;
+  /** 행발 글자 한도 (나이스 바이트) */
+  behaviorByteLimit: number;
+  seating: SeatingRules;
+  /** 구글 캘린더에 상담 일정·제출 마감을 넣는가, 넣는 캘린더 */
+  calendarOn?: boolean;
+  calendarId?: string;
 }
 
 export interface AppState {
@@ -150,9 +250,15 @@ export interface AppState {
   students: Student[];
   records: AttendanceRecord[];
   notes: Note[];
+  checklists: Checklist[];
+  pilsa: PilsaTask[];
+  incidents: Incident[];
+  seatPlans: SeatPlan[];
+  behavior: BehaviorDraft[];
+  calendarLinks: CalendarLink[];
   holidays: Holiday[];
   settings: Settings;
-  /** 지운 항목과 지운 시각 (키: 'r:기록id' / 's:학생id' / 'n:기록id' / 'h:날짜'). 다른 기기에도 지운 것이 퍼지게 한다. */
+  /** 지운 항목과 지운 시각 (키: 'r:기록id' / 's:학생id' / 'n:기록id' / 'h:날짜' 등, merge.ts 참고). 다른 기기에도 지운 것이 퍼지게 한다. */
   tombstones: Record<string, string>;
 }
 
@@ -165,8 +271,26 @@ export const DEFAULT_SETTINGS: Settings = {
   tripMaxConsecutiveDays: 10,
   fieldTripYearlyMax: 20,
   examPeriods: [],
+  pilsaBase: 1,
+  pilsaStep: 1,
+  behaviorByteLimit: 1500,
+  seating: { rows: 5, cols: 6, pair: true, front: [], apart: [] },
 };
 
 export function emptyState(): AppState {
-  return { version: 6, students: [], records: [], notes: [], holidays:[...PUBLIC_HOLIDAYS], settings: { ...DEFAULT_SETTINGS }, tombstones: {} };
+  return {
+    version: 6,
+    students: [],
+    records: [],
+    notes: [],
+    checklists: [],
+    pilsa: [],
+    incidents: [],
+    seatPlans: [],
+    behavior: [],
+    calendarLinks: [],
+    holidays: [...PUBLIC_HOLIDAYS],
+    settings: { ...DEFAULT_SETTINGS },
+    tombstones: {},
+  };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { indexHolidays } from './calendar';
 import { widgetSummary } from './pending';
 import { rebuildDocs } from './rules';
-import { DEFAULT_SETTINGS, type AppState, type AttendanceRecord } from './types';
+import { DEFAULT_SETTINGS, emptyState, type AppState, type AttendanceRecord } from './types';
 
 function rec(p: Partial<AttendanceRecord> & Pick<AttendanceRecord, 'id' | 'startDate'>): AttendanceRecord {
   const status = p.status ?? '결석';
@@ -21,13 +21,11 @@ function rec(p: Partial<AttendanceRecord> & Pick<AttendanceRecord, 'id' | 'start
 
 function stateOf(records: AttendanceRecord[]): AppState {
   return {
-    version: 6,
+    ...emptyState(),
     students: [{ id: 's1', number: 3, name: '김하늘' }],
     records,
-    notes: [],
     holidays: [],
     settings: { ...DEFAULT_SETTINGS, className: '2-3' },
-    tombstones: {},
   };
 }
 
