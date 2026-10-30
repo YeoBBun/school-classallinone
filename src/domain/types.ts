@@ -136,6 +136,14 @@ export interface Note extends Stamped {
   history?: NoteVersion[];
 }
 
+/** 선생님이 직접 적어 둔 할 일 (처리 예정 «기타»). 다 하면 지운다 */
+export interface Todo extends Stamped {
+  id: string;
+  text: string;
+  due?: DateStr;
+  createdAt: DateStr;
+}
+
 /** 고치기 전의 기록 한 판 */
 export interface NoteVersion {
   /** 이 판을 저장한 시각 (ISO). 모르면 없음 */
@@ -260,6 +268,7 @@ export interface AppState {
   events: ClassEvent[];
   behavior: BehaviorDraft[];
   calendarLinks: CalendarLink[];
+  todos: Todo[];
   holidays: Holiday[];
   settings: Settings;
   /** 지운 항목과 지운 시각 (키: 'r:기록id' / 's:학생id' / 'n:기록id' / 'h:날짜' 등, merge.ts 참고). 다른 기기에도 지운 것이 퍼지게 한다. */
@@ -293,6 +302,7 @@ export function emptyState(): AppState {
     events: [],
     behavior: [],
     calendarLinks: [],
+    todos: [],
     holidays: [...PUBLIC_HOLIDAYS],
     settings: { ...DEFAULT_SETTINGS },
     tombstones: {},

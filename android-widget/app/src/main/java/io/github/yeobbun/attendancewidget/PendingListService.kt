@@ -36,7 +36,7 @@ class PendingListService : RemoteViewsService() {
         override fun getViewAt(position: Int): RemoteViews = when (val e = entries[position]) {
             is Header -> RemoteViews(ctx.packageName, R.layout.widget_header).apply {
                 setTextViewText(R.id.header_title, e.title)
-                setTextViewText(R.id.header_count, if (e.title == "필사") "" else e.count.toString())
+                setTextViewText(R.id.header_count, e.count.toString())
                 setOnClickFillInIntent(R.id.header, Intent())
             }
             is Row -> RemoteViews(ctx.packageName, R.layout.widget_item).apply {

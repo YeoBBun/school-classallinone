@@ -22,6 +22,7 @@ const COLLECTIONS = [
   { field: 'events', prefix: 'e:' },
   { field: 'behavior', prefix: 'b:' },
   { field: 'calendarLinks', prefix: 'cl:' },
+  { field: 'todos', prefix: 'td:' },
   { field: 'holidays', prefix: 'h:' },
 ] as const;
 

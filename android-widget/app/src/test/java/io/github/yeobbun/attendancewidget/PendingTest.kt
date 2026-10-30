@@ -56,7 +56,7 @@ class PendingTest {
               {"title":"제출물","rows":[
                 {"title":"현장학습 동의서","text":"3명 안 냄","detail":"11/3(화)까지","due":"2026-11-03"},
                 {"title":"가정통신문","text":"1명 안 냄","detail":"10/28(수)까지","due":"2026-10-28"}]},
-              {"title":"필사","rows":[{"title":"필사","text":"2명이 5장 덜 냄"}]}]}
+              {"title":"필사","rows":[{"title":"1. 김하늘","text":"3장 남음","detail":"10/20(화) 휴대폰 사용"}]}]}
         """.trimIndent()
         val s = Pending.parse(plain)
         assertEquals(listOf("D-0", "D-3"), s.sections[0].rows.map { it.dday("2026-10-30") })

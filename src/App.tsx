@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { BehaviorView } from './components/BehaviorView';
 import { ChecklistView } from './components/ChecklistView';
+import { FilesView } from './components/FilesView';
+import { GoogleHeaderButton } from './components/GoogleLogin';
 import { Dashboard } from './components/Dashboard';
 import { NuggaView } from './components/NuggaView';
 import { PilsaView } from './components/PilsaView';
@@ -11,22 +13,20 @@ import { RecordList } from './components/RecordList';
 import { SettingsView } from './components/SettingsView';
 import { StudentsView } from './components/StudentsView';
 import { Today } from './components/Today';
-import { signIn } from './google/google';
-import { useGoogle } from './google/useGoogle';
 import { StoreProvider, useNeedBackup, useStore } from './store';
-import { isGithub, loadSyncConfig } from './sync/cloud';
 
 /**
  * 메뉴는 오늘 / 더보기 / 설정. 매일 하는 일(출결, 학생 기록)은 오늘 화면에서 학생을 눌러 끝낸다.
  * «더보기» 는 화면을 넘기지 않고 그 자리에서 작은 창으로 연다 (어느 화면에서든 한 번에 이동).
  */
-const MORE: readonly { id: 'schedule' | 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'records'; label: string; icon: IconName }[] = [
+const MORE: readonly { id: 'schedule' | 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'records' | 'files'; label: string; icon: IconName }[] = [
   { id: 'schedule', label: '일정', icon: 'today' },
   { id: 'checklists', label: '제출물', icon: 'check' },
   { id: 'pilsa', label: '필사', icon: 'doc' },
   { id: 'seating', label: '자리', icon: 'grid' },
   { id: 'nuga', label: '생기부', icon: 'pen' },
   { id: 'records', label: '출결', icon: 'list' },
+  { id: 'files', label: '자료', icon: 'folder' },
 ];
 
 /** 한 화면 안의 탭: 주소는 따로 두어 예전 링크도 그대로 열린다 */
@@ -81,7 +81,7 @@ function Shell() {
             학급관리
             {state.settings.className && <span className="class-name">{state.settings.className}</span>}
           </h1>
-          <GoogleReconnect />
+          <GoogleHeaderButton />
           {sync.kind === 'error' && (
             <a href="#settings/google" className="sync-badge error" title={sync.message}>
               ⚠ 동기화 안 됨
@@ -122,6 +122,7 @@ function Shell() {
         {page === 'seating' && <SeatingView />}
         {page === 'nuga' && <NuggaView />}
         {page === 'behavior' && <BehaviorView />}
+        {page === 'files' && <FilesView />}
         {page === 'settings' && <SettingsView section={sub} />}
       </main>
     </div>
@@ -166,25 +167,6 @@ function MorePopup({ current, onClose }: { current: Page; onClose: () => void })
         </ul>
       </div>
     </div>
-  );
-}
-
-/** 구글 연결이 끝났는데 드라이브·캘린더를 쓰고 있으면 머리글에 크게 띄운다 */
-function GoogleReconnect() {
-  const g = useGoogle();
-  const { state } = useStore();
-  const [error, setError] = useState('');
-  const cfg = loadSyncConfig();
-  const uses = (!!cfg && !isGithub(cfg)) || !!state.settings.calendarOn;
-  if (!g.configured || g.connected || !uses) return null;
-  return (
-    <button
-      className="primary small reconnect"
-      title={error || '한 시간쯤 지나면 구글 연결이 끝나요. 눌러서 다시 연결하세요.'}
-      onClick={() => signIn().then(() => setError(''), (e) => setError(e instanceof Error ? e.message : String(e)))}
-    >
-      구글 다시 연결
-    </button>
   );
 }
 

@@ -4,7 +4,7 @@
  */
 import { formatKo, type HolidayIndex } from './calendar';
 import { pendingDocs, shortTitle, studentName } from './pending';
-import { planSections, type PlanRow } from './plan';
+import { pilsaDetail, planSections, type PlanRow } from './plan';
 import { DOC_FT_REPORT } from './rules';
 import type { AppState, DateStr, Note } from './types';
 
@@ -76,7 +76,9 @@ export function widgetSummary(state: AppState, holidays: HolidayIndex, today: Da
       case 'followUp':
         return { title: who(r.note), text: r.note.followUp ?? '', detail: `${formatKo(r.note.date)} ${r.note.kind}` };
       case 'pilsa':
-        return { title: '필사', text: `${r.students}명이 ${r.pages}장 덜 냄` };
+        return { title: studentName(state, r.studentId), text: `${r.remaining}장 남음`, detail: pilsaDetail(r.tasks) };
+      case 'todo':
+        return { title: r.todo.text, text: '', ...(r.todo.due ? { detail: `${formatKo(r.todo.due)}까지`, due: r.todo.due } : {}) };
     }
   };
   return {

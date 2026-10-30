@@ -203,6 +203,28 @@ function driveError(e: unknown): never {
   throw new SyncError('인터넷에 연결되지 않았거나 이 네트워크에서 구글이 막혀 있어요.');
 }
 
+const WRONG_PASS = '잠금 비밀번호가 다른 기기와 달라요.';
+
+/** 드라이브에 다른 기기가 올린 기록이 있는가 — 처음 로그인할 때 잠금 비밀번호를 새로 정할지 물을지 고른다 */
+export async function driveHasState(): Promise<boolean> {
+  try {
+    return !!(await google.findFile(DRIVE_FILE, await google.rootFolder()));
+  } catch (e) {
+    driveError(e);
+  }
+}
+
+/** 잠금 비밀번호가 드라이브의 기록과 맞는가 (기록이 없으면 맞는 것으로) */
+export async function drivePassphraseOk(passphrase: string): Promise<boolean> {
+  try {
+    await pullDrive({ kind: 'google', passphrase });
+    return true;
+  } catch (e) {
+    if (e instanceof SyncError && e.message === WRONG_PASS) return false;
+    throw e;
+  }
+}
+
 async function pullDrive(cfg: GoogleSyncConfig): Promise<Remote | null> {
   try {
     const folder = await google.rootFolder();
@@ -213,7 +235,7 @@ async function pullDrive(cfg: GoogleSyncConfig): Promise<Remote | null> {
     try {
       plain = await decrypt(env, cfg.passphrase);
     } catch {
-      throw new SyncError('잠금 비밀번호가 다른 기기와 달라요.');
+      throw new SyncError(WRONG_PASS);
     }
     return { state: normalize(plain), sha: file.version, fileId: file.id };
   } catch (e) {

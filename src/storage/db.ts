@@ -87,6 +87,7 @@ export function normalize(raw: unknown): AppState {
     events: list(s.events),
     behavior: list(s.behavior),
     calendarLinks: list(s.calendarLinks),
+    todos: list(s.todos),
     holidays: s.holidays,
     settings: { ...settings, seating: { ...DEFAULT_SETTINGS.seating, ...settings.seating } },
     tombstones: s.tombstones ?? {},

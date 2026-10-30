@@ -177,6 +177,7 @@ export function signOut(): void {
   token = null;
   try {
     localStorage.removeItem(FOLDER_KEY);
+    localStorage.removeItem(FILES_FOLDER_KEY);
   } catch {
     /* 무시 */
   }
@@ -282,6 +283,99 @@ export async function createSheet(title: string, rows: string[][]): Promise<stri
   const r = await api(`${UPLOAD}/files?uploadType=multipart&fields=id`, { method: 'POST', ...part });
   const { id } = (await r.json()) as { id: string };
   return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+}
+
+// ─── 자료 (드라이브 '학급관리/자료' 폴더) ───
+
+/** 자료를 올리는 폴더 이름 ('학급관리' 폴더 안) */
+export const FILES_FOLDER = '자료';
+const FILES_FOLDER_KEY = 'class-google-files-folder';
+const FILE_FIELDS = 'id,name,mimeType,size,modifiedTime,webViewLink';
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  /** 바이트 (구글 문서·시트에는 없다) */
+  size?: string;
+  modifiedTime: string;
+  webViewLink: string;
+}
+
+/** '학급관리/자료' 폴더 (없거나 휴지통에 있으면 새로 만든다) */
+export async function filesFolder(): Promise<string> {
+  let cached: string | null = null;
+  try {
+    cached = localStorage.getItem(FILES_FOLDER_KEY);
+  } catch {
+    /* 무시 */
+  }
+  if (cached) {
+    try {
+      const r = await api(`${DRIVE}/files/${cached}?fields=trashed`);
+      if (!((await r.json()) as { trashed?: boolean }).trashed) return cached;
+    } catch (e) {
+      if (!(e instanceof GoogleError && e.status === 404)) throw e;
+    }
+  }
+  const root = await rootFolder();
+  const found = await findOne(`name='${q(FILES_FOLDER)}' and mimeType='${FOLDER_MIME}' and '${q(root)}' in parents and trashed=false`);
+  const id =
+    found?.id ??
+    ((await (
+      await api(`${DRIVE}/files?fields=id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: FILES_FOLDER, mimeType: FOLDER_MIME, parents: [root] }),
+      })
+    ).json()) as { id: string }).id;
+  try {
+    localStorage.setItem(FILES_FOLDER_KEY, id);
+  } catch {
+    /* 무시 */
+  }
+  return id;
+}
+
+/** 폴더 안 파일 (최근에 고친 것부터). drive.file 권한이라 이 앱으로 올린 파일만 보인다 */
+export async function listFiles(folderId: string): Promise<DriveFile[]> {
+  const out: DriveFile[] = [];
+  let page = '';
+  do {
+    const query = encodeURIComponent(`'${q(folderId)}' in parents and trashed=false and mimeType!='${FOLDER_MIME}'`);
+    const r = await api(
+      `${DRIVE}/files?q=${query}&fields=nextPageToken,files(${FILE_FIELDS})&orderBy=modifiedTime desc&pageSize=200${page ? `&pageToken=${page}` : ''}`,
+    );
+    const j = (await r.json()) as { files: DriveFile[]; nextPageToken?: string };
+    out.push(...j.files);
+    page = j.nextPageToken ?? '';
+  } while (page);
+  return out;
+}
+
+/** 파일 하나 올리기. 이어 올리기(resumable) 주소를 받아 한 번에 보낸다 — 큰 파일도 된다 */
+export async function uploadFile(folderId: string, file: File): Promise<DriveFile> {
+  const type = file.type || 'application/octet-stream';
+  const start = await api(`${UPLOAD}/files?uploadType=resumable&fields=${FILE_FIELDS}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': type },
+    body: JSON.stringify({ name: file.name, parents: [folderId] }),
+  });
+  const location = start.headers.get('Location');
+  if (!location) {
+    // 주소를 못 읽는 환경이면 작은 파일은 한 번에 올린다
+    if (file.size > 5 * 1024 * 1024) throw new GoogleError('큰 파일을 올리지 못했어요. 구글 드라이브에서 직접 올려 주세요.', 0);
+    const part = multipart({ name: file.name, parents: [folderId] }, file, type);
+    return (await (await api(`${UPLOAD}/files?uploadType=multipart&fields=${FILE_FIELDS}`, { method: 'POST', ...part })).json()) as DriveFile;
+  }
+  const r = await fetch(location, { method: 'PUT', headers: { 'Content-Type': type }, body: file });
+  if (!r.ok) throw new GoogleError(`'${file.name}'을 올리지 못했어요 (${r.status})`, r.status);
+  return (await r.json()) as DriveFile;
+}
+
+/** 드라이브 휴지통으로 (30일 동안 드라이브에서 되살릴 수 있다) */
+export async function trashFile(id: string): Promise<void> {
+  await api(`${DRIVE}/files/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
 }
 
 // ─── 캘린더 ───

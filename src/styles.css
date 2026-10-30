@@ -727,3 +727,38 @@ a.rec-row .body, button.rec-row .body { display: block; }
 .note-history { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 8px; }
 .note-history p { margin: 2px 0 0; white-space: pre-wrap; color: var(--text); }
 .print-stamp { margin-top: 2px; font-size: 9pt; color: #555; }
+
+/* 처리 예정 «기타»: 직접 적는 할 일 */
+.todo-card .card-head { display: flex; align-items: center; }
+.todo-list .todo-text { color: var(--text); font-size: 14px; }
+.todo-form { width: 100%; }
+.todo-form form { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; padding: 4px 0; }
+.todo-form input:not([type='date']) { flex: 1 1 160px; min-width: 0; }
+.todo-form input[type='date'] { flex: 0 0 auto; }
+
+/* 구글 로그인 창 */
+.login-points { margin: 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.6; }
+.login-dialog h4 { margin: 4px 0 0; }
+.sync-badge.g-on { color: var(--primary); }
+
+/* 자료 (구글 드라이브) */
+.drop-zone {
+  display: grid; justify-items: center; gap: 8px; padding: 22px 16px; border: 2px dashed var(--line); border-radius: var(--radius);
+  text-align: center; color: var(--text-2);
+}
+.drop-zone.over { border-color: var(--primary); background: var(--primary-soft); }
+.file-list { list-style: none; padding: 0; margin: 0; }
+.file-list li { display: flex; align-items: center; gap: 10px; padding: 10px 2px; }
+.file-list li + li { border-top: 1px solid var(--line); }
+.file-list .ext {
+  flex: none; min-width: 42px; padding: 3px 0; border-radius: 6px; text-align: center;
+  font-size: 11px; font-weight: 700; background: var(--surface-2); color: var(--text-2);
+}
+.file-list .name { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); text-decoration: none; font-weight: 600; }
+.file-list .name:hover { text-decoration: underline; }
+.file-list .meta { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+@media (max-width: 640px) {
+  .file-list li { flex-wrap: wrap; }
+  .file-list .meta { order: 3; width: 100%; text-align: left; padding-left: 52px; }
+}
+.todo-list .row-btn { justify-content: flex-start; text-align: left; }

@@ -1,11 +1,11 @@
 /**
- * 오늘 화면 «처리 예정»과 휴대폰 위젯이 같이 쓰는 묶음: 출결 서류 · 일정 · 제출물 · 할 일 · 필사.
+ * 오늘 화면 «처리 예정»과 휴대폰 위젯이 같이 쓰는 묶음: 출결 서류 · 일정 · 제출물 · 미처리 · 필사 · 기타.
  * 학생별이 아니라 종류별로 모은다.
  */
-import { parseDate, type HolidayIndex } from './calendar';
+import { formatKo, parseDate, type HolidayIndex } from './calendar';
 import { todoSummary } from './classroom';
 import { pendingDocs, type PendingRow } from './pending';
-import type { AppState, Checklist, ClassEvent, DateStr, Note } from './types';
+import type { AppState, Checklist, ClassEvent, DateStr, Note, PilsaTask, Todo } from './types';
 
 export type PlanRow =
   | ({ type: 'doc' } & PendingRow)
@@ -14,9 +14,12 @@ export type PlanRow =
   | { type: 'checklist'; checklist: Checklist; missing: number }
   | { type: 'unwritten'; note: Note }
   | { type: 'followUp'; note: Note }
-  | { type: 'pilsa'; students: number; pages: number };
+  /** 필사를 다 안 낸 학생 한 명. tasks 는 덜 낸 부여 (오래된 것부터) */
+  | { type: 'pilsa'; studentId: string; remaining: number; tasks: PilsaTask[] }
+  /** 선생님이 직접 적은 할 일 */
+  | { type: 'todo'; todo: Todo };
 
-export const PLAN_SECTIONS = ['출결 서류', '일정', '제출물', '할 일', '필사'] as const;
+export const PLAN_SECTIONS = ['출결 서류', '일정', '제출물', '미처리', '필사', '기타'] as const;
 export type PlanSectionTitle = (typeof PLAN_SECTIONS)[number];
 
 export interface PlanSection {
@@ -40,12 +43,38 @@ export function planSections(s: AppState, holidays: HolidayIndex, today: DateStr
     { title: '일정', rows: schedule },
     { title: '제출물', rows: t.checklists.map((c) => ({ type: 'checklist', ...c })) },
     {
-      title: '할 일',
+      title: '미처리',
       rows: [...t.unwritten.map((note): PlanRow => ({ type: 'unwritten', note })), ...t.followUps.map((note): PlanRow => ({ type: 'followUp', note }))],
     },
-    { title: '필사', rows: t.pilsaStudents ? [{ type: 'pilsa', students: t.pilsaStudents, pages: t.pilsaPages }] : [] },
+    { title: '필사', rows: pilsaRows(s) },
+    {
+      title: '기타',
+      // 기한 있는 것을 가까운 순으로 위에, 없는 것은 적은 순으로
+      rows: [...s.todos]
+        .sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999') || a.createdAt.localeCompare(b.createdAt))
+        .map((todo) => ({ type: 'todo', todo })),
+    },
   ];
   return sections.filter((x) => x.rows.length > 0);
+}
+
+/** 필사를 덜 낸 학생을 번호순으로 */
+function pilsaRows(s: AppState): PlanRow[] {
+  const open = new Map<string, PilsaTask[]>();
+  for (const p of s.pilsa) if (p.submitted.length < p.pages) open.set(p.studentId, [...(open.get(p.studentId) ?? []), p]);
+  return [...s.students]
+    .sort((a, b) => a.number - b.number)
+    .flatMap((st): PlanRow[] => {
+      const tasks = open.get(st.id)?.sort((a, b) => a.date.localeCompare(b.date));
+      if (!tasks) return [];
+      return [{ type: 'pilsa', studentId: st.id, remaining: tasks.reduce((n, p) => n + p.pages - p.submitted.length, 0), tasks }];
+    });
+}
+
+/** 필사 줄의 둘째 정보. 예: 10/20(화) 휴대폰 사용 외 1건 */
+export function pilsaDetail(tasks: PilsaTask[]): string {
+  const first = tasks[0];
+  return `${formatKo(first.date)}${first.reason ? ` ${first.reason}` : ''}${tasks.length > 1 ? ` 외 ${tasks.length - 1}건` : ''}`;
 }
 
 /** 남은 날: 오늘 D-0, 사흘 뒤 D-3, 지났으면 D+2 */

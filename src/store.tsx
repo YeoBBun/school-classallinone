@@ -22,7 +22,7 @@ interface Store {
   /** 기록을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다. label 은 안내에 쓰는 설명 */
   removeRecord: (id: string, label: string) => void;
   /** 어느 목록에서든 항목을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다 */
-  removeItem: (field: UndoField, id: string, label: string) => void;
+  removeItem: (field: UndoField, id: string, label: string, verb?: string) => void;
   /** 관찰·상담 기록을 바로 지우고, 잠깐 동안 '되돌리기'를 보여준다 */
   removeNote: (id: string, label: string) => void;
   /** 휴대폰 ↔ PC 동기화 상태 */
@@ -47,13 +47,15 @@ const SYNC_DEBOUNCE_MS = 4000;
 const SYNC_INTERVAL_MS = 60_000;
 
 /** 지우고 되돌릴 수 있는 목록 */
-export type UndoField = 'records' | 'notes' | 'checklists' | 'pilsa' | 'seatPlans' | 'events';
+export type UndoField = 'records' | 'notes' | 'checklists' | 'pilsa' | 'seatPlans' | 'events' | 'todos';
 
 interface Undo {
   field: UndoField;
   item: { id: string };
   index: number;
   label: string;
+  /** 알림 문구 끝. 기본 '삭제했어요' */
+  verb: string;
 }
 
 const UNDO_MS = 8000;
@@ -78,13 +80,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeItem = useCallback(
-    (field: UndoField, id: string, label: string) => {
+    (field: UndoField, id: string, label: string, verb = '삭제했어요') => {
       const s = stateRef.current;
       const list = (s?.[field] ?? []) as { id: string }[];
       const index = list.findIndex((x) => x.id === id);
       if (!s || index < 0) return;
       commit((cur) => ({ ...cur, [field]: (cur[field] as { id: string }[]).filter((x) => x.id !== id) }));
-      setUndo({ field, item: list[index], index, label });
+      setUndo({ field, item: list[index], index, label, verb });
     },
     [commit],
   );
@@ -247,7 +249,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       {children}
       {undo && (
         <div className="toast" role="status">
-          <span>{undo.label} 삭제했어요</span>
+          <span>
+            {undo.label} {undo.verb}
+          </span>
           <button onClick={restore}>되돌리기</button>
         </div>
       )}
