@@ -55,10 +55,10 @@ function Shell() {
       <header className="top">
         <div className="brand">
           <span className="logo" aria-hidden>
-            출
+            학
           </span>
           <h1>
-            출결·서류 관리
+            학급관리
             {state.settings.className && <span className="class-name">{state.settings.className}</span>}
           </h1>
           {sync.kind !== 'off' && (

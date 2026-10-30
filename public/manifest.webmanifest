@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "출결·서류 관리",
-  "short_name": "출결",
+  "name": "학급관리",
+  "short_name": "학급관리",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
