@@ -101,6 +101,29 @@ export interface AttendanceRecord extends Stamped {
   memo: string;
 }
 
+/** 학생 기록 유형 */
+export const NOTE_KINDS = ['관찰', '학생상담', '학부모상담'] as const;
+export type NoteKind = (typeof NOTE_KINDS)[number];
+
+export const PARENT_METHODS = ['대면', '전화', '문자'] as const;
+export type ParentMethod = (typeof PARENT_METHODS)[number];
+
+/** 관찰·학생상담·학부모상담 기록 */
+export interface Note extends Stamped {
+  id: string;
+  /** 같이 상담한 학생 등 여러 명일 수 있다 */
+  studentIds: string[];
+  kind: NoteKind;
+  date: DateStr;
+  content: string;
+  /** 후속 조치 (할 일) */
+  followUp?: string;
+  followUpDone?: boolean;
+  /** 학부모상담일 때만: 상담한 보호자 (어머니, 아버지 등) */
+  parentWho?: string;
+  parentMethod?: ParentMethod;
+}
+
 export type DeadlineBasis = 'school' | 'calendar';
 
 export interface Settings extends Stamped {
@@ -123,12 +146,13 @@ export interface Settings extends Stamped {
 }
 
 export interface AppState {
-  version: 5;
+  version: 6;
   students: Student[];
   records: AttendanceRecord[];
+  notes: Note[];
   holidays: Holiday[];
   settings: Settings;
-  /** 지운 항목과 지운 시각 (키: 'r:기록id' / 's:학생id' / 'h:날짜'). 다른 기기에도 지운 것이 퍼지게 한다. */
+  /** 지운 항목과 지운 시각 (키: 'r:기록id' / 's:학생id' / 'n:기록id' / 'h:날짜'). 다른 기기에도 지운 것이 퍼지게 한다. */
   tombstones: Record<string, string>;
 }
 
@@ -144,5 +168,5 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function emptyState(): AppState {
-  return { version: 5, students: [], records: [], holidays: [...PUBLIC_HOLIDAYS], settings: { ...DEFAULT_SETTINGS }, tombstones: {} };
+  return { version: 6, students: [], records: [], notes: [], holidays:[...PUBLIC_HOLIDAYS], settings: { ...DEFAULT_SETTINGS }, tombstones: {} };
 }

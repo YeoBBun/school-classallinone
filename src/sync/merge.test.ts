@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { emptyState, type AppState, type AttendanceRecord } from '../domain/types';
+import { emptyState, type AppState, type AttendanceRecord, type Note } from '../domain/types';
+import { normalize } from '../storage/db';
 import { canonical, mergeStates, stamp } from './merge';
 
 const rec = (id: string, memo = ''): AttendanceRecord => ({
@@ -46,6 +47,41 @@ describe('두 기기 합치기', () => {
     const m = mergeStates(b, a, now);
     expect(m.settings.className).toBe('1-4');
     expect(m.settings.lastBackupAt).toBe('B');
+  });
+});
+
+describe('관찰·상담 기록', () => {
+  const now = new Date('2026-10-19T12:00:00Z');
+  const note = (id: string, content: string, updatedAt: string, studentIds = ['s1']): Note => ({
+    id, studentIds, kind: '관찰', date: '2026-10-19', content, updatedAt,
+  });
+
+  it('출결처럼 나중에 고친 쪽을 남기고, 지운 기록은 지운 채로', () => {
+    const phone = { ...base(), notes: [note('a', '폰', '2026-10-19T10:00:00Z'), note('b', '', '2026-10-19T09:00:00Z')] };
+    const pc = { ...base(), notes: [note('a', 'PC', '2026-10-19T11:00:00Z')], tombstones: { 'n:b': '2026-10-19T10:00:00Z' } };
+    const m = mergeStates(phone, pc, now);
+    expect(m.notes.map((n) => [n.id, n.content])).toEqual([['a', 'PC']]);
+    expect(canonical(m)).toBe(canonical(mergeStates(pc, phone, now)));
+  });
+
+  it('지운 기록은 tombstone 으로 남는다', () => {
+    const s0 = stamp(base(), { ...base(), notes: [note('a', '', '')] }, 'T1');
+    expect(stamp(s0, { ...s0, notes: [] }, 'T2').tombstones).toEqual({ 'n:a': 'T2' });
+  });
+
+  it('합쳐진 학생으로 기록도 옮긴다', () => {
+    const phone = { ...base(), students: [{ id: 'p-1', number: 7, name: '박지우' }], notes: [note('a', '', '1', ['p-1', 'c-1'])] };
+    const pc = { ...base(), students: [{ id: 'c-1', number: 7, name: '박지우' }] };
+    expect(mergeStates(phone, pc, now).notes[0].studentIds).toEqual(['c-1']);
+  });
+});
+
+describe('이전 버전 파일', () => {
+  it('v5 파일은 관찰·상담 기록 없이 읽힌다', () => {
+    const { notes: _n, ...v5 } = { ...base(), version: 5 };
+    const s = normalize(v5);
+    expect(s.version).toBe(6);
+    expect(s.notes).toEqual([]);
   });
 });
 

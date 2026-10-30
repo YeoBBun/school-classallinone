@@ -248,7 +248,7 @@ describe('저장 데이터 변환', () => {
       ],
     };
     const s = normalize(v2);
-    expect(s.version).toBe(5);
+    expect(s.version).toBe(6);
     expect(s.settings.tripMaxConsecutiveDays).toBe(7);
     expect(s.records[0].docs.find((d) => d.key === 'evidence:medical')?.required).toBe(false);
     expect(s.records[1].docs.find((d) => d.key === 'evidence:medical')).toMatchObject({ required: true, received: true });

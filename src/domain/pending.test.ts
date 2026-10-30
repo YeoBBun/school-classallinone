@@ -21,9 +21,10 @@ function rec(p: Partial<AttendanceRecord> & Pick<AttendanceRecord, 'id' | 'start
 
 function stateOf(records: AttendanceRecord[]): AppState {
   return {
-    version: 5,
+    version: 6,
     students: [{ id: 's1', number: 3, name: '김하늘' }],
     records,
+    notes: [],
     holidays: [],
     settings: { ...DEFAULT_SETTINGS, className: '2-3' },
     tombstones: {},

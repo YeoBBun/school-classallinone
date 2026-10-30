@@ -270,7 +270,7 @@ function DaySummary({
 }
 
 /** 학생 한 명의 그날 출결을 몇 번의 터치로 입력한다. */
-function QuickEntry({ studentId, date, onClose }: { studentId: string; date: string; onClose: () => void }) {
+export function QuickEntry({ studentId, date, onClose }: { studentId: string; date: string; onClose: () => void }) {
   const { state, update, holidays, docContext } = useStore();
   const [status, setStatus] = useState<Status | null>(null);
   const [kind, setKind] = useState<Kind | null>(null);

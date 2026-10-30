@@ -63,8 +63,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 button.primary, .button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 button.primary:hover:not(:disabled) { background: var(--primary-strong); }
 button.danger { color: var(--danger); border-color: transparent; background: var(--danger-soft); }
-button.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
-button.ghost:hover:not(:disabled) { background: var(--surface-2); }
+button.ghost, .button.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
+button.ghost:hover:not(:disabled), .button.ghost:hover { background: var(--surface-2); }
 button.small { padding: 4px 10px; font-size: 13px; border-radius: 8px; }
 button.on { background: var(--primary-soft); border-color: transparent; color: var(--primary); font-weight: 600; }
 button.link { border: none; background: none; padding: 0; color: var(--primary); text-align: left; }
@@ -338,7 +338,7 @@ details summary { cursor: pointer; color: var(--text-2); font-weight: 600; }
   .top h1 { font-size: 17px; }
   nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-radius: 0; box-shadow: 0 -1px 0 var(--line);
   }
@@ -393,3 +393,48 @@ button.del-btn:hover { border-color: var(--danger); }
 .sync-status.check, .sync-status.error { color: var(--danger); }
 .sync-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--surface-2); white-space: nowrap; }
 .sync-badge.error { color: var(--danger); }
+
+/* ───────── 학생 한눈에 보기 ───────── */
+/* 기록 유형 색: 꼬리표와 요약 카드가 --k 를 쓴다 */
+.n-obs { --k: #0e9f8e; }
+.n-counsel { --k: #8b5cf6; }
+.n-parent { --k: #e8710a; }
+a.student-btn { text-decoration: none; color: inherit; }
+.small { font-size: 12px; }
+.back-link { margin-bottom: 8px; }
+.student-page .page-head { margin-bottom: 12px; }
+.student-title { margin: 0; font-size: 22px; }
+.student-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.summary-cards { display: grid; grid-template-columns: 2fr repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.sum-card {
+  display: grid; gap: 2px; align-content: start; justify-content: stretch; justify-items: start; text-align: left;
+  padding: 14px 16px; border-radius: var(--radius); background: var(--surface);
+  border: 1.5px solid transparent; box-shadow: var(--shadow); font-weight: 400;
+}
+.sum-card .kpi-label { color: var(--k, var(--muted)); }
+.sum-card.on { border-color: var(--k, var(--primary)); }
+.sum-main { font-size: 15px; }
+.sum-main b { font-size: 22px; font-weight: 800; }
+.sum-warn { color: var(--danger); font-size: 13px; font-weight: 600; }
+.note-text { margin: 8px 0 0; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; cursor: pointer; }
+.follow-up { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; color: var(--text-2); }
+.follow-up.done { color: var(--muted); text-decoration: line-through; }
+
+/* ───────── 더보기 ───────── */
+.more-menu { list-style: none; padding: 0; margin: 0 auto; display: grid; gap: 10px; max-width: 640px; }
+.more-item {
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  text-decoration: none; color: var(--text);
+}
+.more-item > .icon:first-child { color: var(--primary); }
+.more-item > span:nth-child(2) { flex: 1; display: grid; gap: 2px; }
+.more-item .muted { font-size: 13px; }
+
+@media (max-width: 960px) {
+  .summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-cards .sum-card:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .student-actions button { flex: 1; }
+}

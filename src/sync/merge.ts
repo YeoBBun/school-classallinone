@@ -14,6 +14,7 @@ type Keyed = Stamped & object;
 const COLLECTIONS = [
   { field: 'records', prefix: 'r:' },
   { field: 'students', prefix: 's:' },
+  { field: 'notes', prefix: 'n:' },
   { field: 'holidays', prefix: 'h:' },
 ] as const;
 
@@ -93,6 +94,11 @@ function dedupeStudents(s: AppState) {
   if (!remap.size) return;
   s.students = s.students.filter((st) => !remap.has(st.id));
   s.records = s.records.map((r) => (remap.has(r.studentId) ? { ...r, studentId: remap.get(r.studentId)! } : r));
+  s.notes = s.notes.map((n) =>
+    n.studentIds.some((id) => remap.has(id))
+      ? { ...n, studentIds: [...new Set(n.studentIds.map((id) => remap.get(id) ?? id))] }
+      : n,
+  );
 }
 
 /** 비교용: 순서·기기 전용 값과 관계없이 같은 내용이면 같은 문자열 */
@@ -102,6 +108,7 @@ export function canonical(s: AppState): string {
   return JSON.stringify({
     students: sortBy(s.students, (x) => x.id),
     records: sortBy(s.records, (x) => x.id),
+    notes: sortBy(s.notes, (x) => x.id),
     holidays: sortBy(s.holidays, (x) => x.date),
     settings,
     tombstones: Object.fromEntries(Object.entries(s.tombstones ?? {}).sort()),

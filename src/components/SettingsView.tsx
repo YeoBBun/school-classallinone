@@ -81,12 +81,18 @@ function RosterSettings() {
 
   const remove = (st: Student) => {
     const count = state.records.filter((r) => r.studentId === st.id).length;
-    const msg = count ? `${st.name} 학생과 출결 기록 ${count}건을 모두 삭제할까요?` : `${st.name} 학생을 삭제할까요?`;
+    const noteCount = state.notes.filter((n) => n.studentIds.includes(st.id)).length;
+    const parts = [count && `출결 기록 ${count}건`, noteCount && `관찰·상담 기록 ${noteCount}건`].filter(Boolean);
+    const msg = parts.length ? `${st.name} 학생과 ${parts.join(', ')}을 모두 삭제할까요?` : `${st.name} 학생을 삭제할까요?`;
     if (!confirm(msg)) return;
     update((s) => ({
       ...s,
       students: s.students.filter((x) => x.id !== st.id),
       records: s.records.filter((r) => r.studentId !== st.id),
+      // 여러 학생이 같이 있는 기록은 그 학생만 빼고 남긴다
+      notes: s.notes
+        .map((n) => (n.studentIds.includes(st.id) ? { ...n, studentIds: n.studentIds.filter((id) => id !== st.id) } : n))
+        .filter((n) => n.studentIds.length > 0),
     }));
   };
 
@@ -377,7 +383,7 @@ function BackupSettings() {
         <span className="spacer" />
         <button
           className="danger"
-          onClick={() => confirm('모든 학생·출결·휴일 데이터를 삭제할까요? 되돌릴 수 없습니다.') && replace(emptyState())}
+          onClick={() => confirm('모든 학생·출결·관찰·상담·휴일 데이터를 삭제할까요? 되돌릴 수 없습니다.') && replace(emptyState())}
         >
           전체 삭제
         </button>

@@ -51,7 +51,7 @@ export function normalize(raw: unknown): AppState {
   if (!raw || typeof raw !== 'object') throw new Error('올바른 백업 파일이 아닙니다.');
   // 이전 버전 파일도 받으므로 version 은 숫자로 넓혀 읽는다.
   const s = raw as Partial<Omit<AppState, 'version'>> & { version?: number };
-  if (![1, 2, 3, 4, 5].includes(s.version ?? 0) || !Array.isArray(s.students) || !Array.isArray(s.records) || !Array.isArray(s.holidays)) {
+  if (![1, 2, 3, 4, 5, 6].includes(s.version ?? 0) ||!Array.isArray(s.students) || !Array.isArray(s.records) || !Array.isArray(s.holidays)) {
     throw new Error('올바른 백업 파일이 아닙니다.');
   }
   const oldSettings = (s.settings ?? {}) as Partial<Settings> & { abroadMaxDays?: number };
@@ -74,7 +74,9 @@ export function normalize(raw: unknown): AppState {
     const ctx = { holidays: indexHolidays(s.holidays), exams: settings.examPeriods };
     records = records.map((r) => ({ ...r, docs: rebuildDocs(r.docs, r, ctx) }));
   }
-  return { version: 5, students: s.students, records, holidays: s.holidays, settings, tombstones: s.tombstones ?? {} };
+  // v6: 관찰·상담 기록(notes)이 생겼다. 이전 파일에는 없다.
+  const notes = Array.isArray(s.notes) ? s.notes : [];
+  return { version: 6, students: s.students, records, notes, holidays: s.holidays, settings, tombstones: s.tombstones ?? {} };
 }
 
 export function exportBackup(state: AppState): void {
