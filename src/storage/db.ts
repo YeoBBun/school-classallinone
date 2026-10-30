@@ -74,7 +74,7 @@ export function normalize(raw: unknown): AppState {
     const ctx = { holidays: indexHolidays(s.holidays), exams: settings.examPeriods };
     records = records.map((r) => ({ ...r, docs: rebuildDocs(r.docs, r, ctx) }));
   }
-  // v6: 학급관리 — 관찰·상담 기록, 제출물, 필사, 사안, 자리, 행발, 캘린더 연결이 생겼다. 이전 파일에는 없다.
+  // v6: 학급관리 — 관찰·상담 기록, 제출물, 필사, 자리, 행발, 캘린더 연결이 생겼다. 이전 파일에는 없다.
   const list = <T,>(x: T[] | undefined): T[] => (Array.isArray(x) ? x : []);
   return {
     version: 6,
@@ -83,7 +83,6 @@ export function normalize(raw: unknown): AppState {
     notes: list(s.notes),
     checklists: list(s.checklists),
     pilsa: list(s.pilsa),
-    incidents: list(s.incidents),
     seatPlans: list(s.seatPlans),
     behavior: list(s.behavior),
     calendarLinks: list(s.calendarLinks),

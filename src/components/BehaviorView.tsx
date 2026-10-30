@@ -66,7 +66,6 @@ function BehaviorEditor({ student, year, onClose }: { student: Student; year: nu
 
   const items = useMemo(() => studentTimeline(student.id, state, from, to), [student.id, state, from, to]);
   const notes = items.flatMap((it) => (it.type === 'note' && !it.note.planned && it.note.content ? [it.note] : []));
-  const incidents = state.incidents.filter((i) => i.studentIds.includes(student.id) && i.date >= from && i.date <= to);
   const pilsa = pilsaSummary(state.pilsa, student.id, from, to);
   const attendance = items.flatMap((it) => (it.type === 'attendance' ? [it.record] : []));
 
@@ -93,20 +92,12 @@ function BehaviorEditor({ student, year, onClose }: { student: Student; year: nu
       <div className="behavior">
         <aside className="behavior-ref">
           <h4>1년 동안 적은 것</h4>
-          {notes.length + incidents.length === 0 && <p className="muted">관찰·상담 기록이 없어요.</p>}
+          {notes.length === 0 && <p className="muted">관찰·상담 기록이 없어요.</p>}
           <ul className="ref-list">
             {notes.map((n) => (
               <li key={n.id}>
                 <span className={`tag ${NOTE_CLASS[n.kind]}`}>{n.kind}</span> <span className="muted small">{formatKo(n.date)}</span>
                 <p>{n.content}</p>
-              </li>
-            ))}
-            {incidents.map((i) => (
-              <li key={i.id}>
-                <span className="tag">사안</span> <span className="muted small">{formatKo(i.date)}</span>
-                <p>
-                  {i.title} ({i.status})
-                </p>
               </li>
             ))}
           </ul>

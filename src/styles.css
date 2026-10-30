@@ -338,7 +338,7 @@ details summary { cursor: pointer; color: var(--text-2); font-weight: 600; }
   .top h1 { font-size: 17px; }
   nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-radius: 0; box-shadow: 0 -1px 0 var(--line);
   }
@@ -467,12 +467,7 @@ input.tiny { width: 56px; }
 .stepper { display: inline-flex; align-items: center; gap: 14px; }
 .stepper button { width: 44px; height: 44px; font-size: 20px; border-radius: 50%; padding: 0; }
 .stepper b { font-size: 20px; min-width: 48px; text-align: center; }
-.warn-tag { --k: var(--danger); }
-.status-0 { --k: var(--danger); }
-.status-1 { --k: #e8710a; }
-.status-2 { --k: var(--muted); }
 .k-pilsa { --k: #2563eb; }
-.k-incident { --k: #dc2626; }
 details.advanced summary { cursor: pointer; font-weight: 600; }
 details.advanced[open] summary { margin-bottom: 8px; }
 .option { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
@@ -486,11 +481,6 @@ details.advanced[open] summary { margin-bottom: 8px; }
 .pilsa-cells { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
 .pilsa-cells .cell { width: 26px; height: 26px; padding: 0; border-radius: 6px; background: var(--danger-soft); border: 1.5px solid color-mix(in srgb, var(--danger) 35%, transparent); }
 .pilsa-cells .cell.done { background: var(--ok); border-color: var(--ok); }
-
-/* 사안 */
-.steps { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 10px; }
-.steps li { display: grid; gap: 6px; padding: 10px; border-radius: var(--radius-sm); background: var(--surface-2); }
-.steps .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* 누가기록 · 행발 */
 .nuga-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
@@ -588,8 +578,8 @@ a.record-main { text-decoration: none; color: inherit; }
 }
 
 /* ───────── 간소화 (2026-10): 색은 셋만 — 기본 회색, 챙길 것 빨강, 끝난 것 초록 ───────── */
-.k-approved, .k-ill, .k-etc, .n-obs, .n-counsel, .n-parent, .k-pilsa, .status-1, .status-2 { --k: var(--text-2); }
-.k-unexcused, .k-incident, .status-0, .warn-tag { --k: var(--danger); }
+.k-approved, .k-ill, .k-etc, .n-obs, .n-counsel, .n-parent, .k-pilsa { --k: var(--text-2); }
+.k-unexcused { --k: var(--danger); }
 .student-btn.has:not(.k-unexcused) { --k: var(--primary); }
 .sum-card .kpi-label { color: var(--muted); }
 .record.planned { border: 1.5px dashed color-mix(in srgb, var(--primary) 45%, transparent); }
@@ -643,3 +633,8 @@ a.record-main { text-decoration: none; color: inherit; }
 }
 .todo-list li { display: flex; align-items: center; gap: 8px; }
 .todo-list li > .row-btn, .todo-list li > .follow-up { flex: 1; }
+
+/* 오늘: 학생을 눌렀을 때 고르기 */
+.choice-grid.two { grid-template-columns: 1fr 1fr; }
+.choice-grid.two .choice { padding: 28px 8px; font-size: 17px; }
+a.choice { display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); }

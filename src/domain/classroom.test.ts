@@ -111,14 +111,13 @@ describe('오늘 챙길 일', () => {
       ],
       checklists: [{ id: 'k', title: '회신', createdAt: '2026-10-01', marks: { s1: '2026-10-02' } }],
       pilsa: [{ id: 'p', studentId: 's2', date: '2026-10-01', reason: '', pages: 3, submitted: ['2026-10-02'] }],
-      incidents: [{ id: 'i', title: '다툼', date: '2026-10-01', studentIds: ['s1'], status: '진행 중', steps: [] }],
     };
     const t = todoSummary(s, '2026-10-30');
     expect(t.upcoming.map((n) => n.id)).toEqual(['b']);
     expect(t.unwritten.map((n) => n.id)).toEqual(['a']);
     expect(t.followUps.map((n) => n.id)).toEqual(['c']);
     expect(t.checklists).toEqual([{ checklist: s.checklists[0], missing: 3 }]);
-    expect([t.openIncidents, t.pilsaStudents, t.pilsaPages]).toEqual([1, 1, 2]);
+    expect([t.pilsaStudents, t.pilsaPages]).toEqual([1, 2]);
   });
 });
 
@@ -141,7 +140,6 @@ describe('학생 합치기·지우기', () => {
     ...base(),
     notes: [{ id: 'n', studentIds: ['s1', 's2'], kind: '관찰', date: '2026-10-01', content: '' }],
     pilsa: [{ id: 'p', studentId: 's1', date: '2026-10-01', reason: '', pages: 1, submitted: [] }],
-    incidents: [{ id: 'i', title: '', date: '2026-10-01', studentIds: ['s1'], status: '진행 중', steps: [] }],
     checklists: [{ id: 'c', title: '', createdAt: '2026-10-01', marks: { s1: 'exempt' } }],
     seatPlans: [{ id: 'sp', date: '2026-10-01', rows: 1, cols: 2, pair: true, seats: ['s1', 's2'] }],
     behavior: [{ id: '2026:s1', studentId: 's1', year: 2026, text: '성실함' }],
@@ -150,7 +148,6 @@ describe('학생 합치기·지우기', () => {
     const s = remapStudents(full(), new Map([['s1', 's9']]));
     expect(s.notes[0].studentIds).toEqual(['s9', 's2']);
     expect(s.pilsa[0].studentId).toBe('s9');
-    expect(s.incidents[0].studentIds).toEqual(['s9']);
     expect(s.checklists[0].marks).toEqual({ s9: 'exempt' });
     expect(s.seatPlans[0].seats).toEqual(['s9', 's2']);
     expect(s.behavior[0].id).toBe('2026:s9');

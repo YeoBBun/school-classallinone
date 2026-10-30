@@ -3,11 +3,10 @@ import { formatKo, schoolYearOf, schoolYearRange, today } from '../domain/calend
 import { checklistProgress, pilsaSummary } from '../domain/classroom';
 import { summarize } from '../domain/stats';
 import { itemKey, matchesQuery, noteCounts, studentTimeline, type TimelineItem } from '../domain/student';
-import { KINDS, NOTE_KINDS, STATUSES, type AttendanceRecord, type Incident, type Note, type NoteKind, type Student } from '../domain/types';
+import { KINDS, NOTE_KINDS, STATUSES, type AttendanceRecord, type Note, type NoteKind, type Student } from '../domain/types';
 import { useStore } from '../store';
-import { Modal, recordTitle, sortStudents } from './common';
+import { Modal, recordTitle } from './common';
 import { Icon, type IconName } from './icons';
-import { IncidentForm } from './IncidentsView';
 import { NoteForm } from './NoteForm';
 import { RecordForm } from './RecordForm';
 import { RecordItem } from './RecordItem';
@@ -15,13 +14,13 @@ import { QuickEntry } from './Today';
 import { GiveForm } from './PilsaView';
 import { Menu, nameOf, PrintSheet } from './ui';
 
-type Filter = 'all' | 'attendance' | NoteKind | 'pilsa' | 'incident' | 'todo';
+type Filter = 'all' | 'attendance' | NoteKind | 'pilsa' | 'todo';
 
 export const NOTE_CLASS: Record<NoteKind, string> = { 관찰: 'n-obs', 학생상담: 'n-counsel', 학부모상담: 'n-parent' };
 
 const PRIVACY_KEY = 'class-privacy';
 
-/** 가림 모드: 전자칠판·화면 공유 중에 상담·사안 내용을 숨긴다 (이 기기에만 기억) */
+/** 가림 모드: 전자칠판·화면 공유 중에 상담 내용을 숨긴다 (이 기기에만 기억) */
 function usePrivacy(): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => {
     try {
@@ -41,58 +40,23 @@ function usePrivacy(): [boolean, (on: boolean) => void] {
   return [on, set];
 }
 
-/** 학생 탭: 명단 → 학생을 누르면 그 학생에 대해 적은 것을 한 화면에 모아 본다. */
-export function StudentsView({ studentId }: { studentId: string | null }) {
+/** 학생 기록: 오늘 화면에서 학생을 누르고 [학생 기록]을 고르면 열린다. 그 학생에 대해 적은 것을 한 화면에 모아 본다. */
+export function StudentsView({ studentId }: { studentId: string }) {
   const { state } = useStore();
-  const student = studentId ? state.students.find((s) => s.id === studentId) : undefined;
-  if (student) return <StudentPage studentId={student.id} />;
-
-  if (state.students.length === 0) {
+  if (!state.students.some((s) => s.id === studentId)) {
     return (
       <div className="empty">
-        <p>학생 명단이 아직 없어요.</p>
-        <a className="button primary" href="#settings/class">
-          설정에서 명단 등록하기
+        <p>없는 학생이에요.</p>
+        <a className="button primary" href="#today">
+          오늘로
         </a>
       </div>
     );
   }
-
-  return <Roster />;
+  return <StudentPage studentId={studentId} />;
 }
 
-function Roster() {
-  const { state } = useStore();
-  const counts = useMemo(() => {
-    const [from, to] = schoolYearRange(schoolYearOf(today()));
-    const map = new Map<string, number>();
-    for (const n of state.notes) {
-      if (n.date < from || n.date > to || n.planned) continue;
-      for (const id of n.studentIds) map.set(id, (map.get(id) ?? 0) + 1);
-    }
-    return map;
-  }, [state.notes]);
-
-  return (
-    <section className="card">
-      <div className="card-head">
-        <h3>학생을 누르면 그 학생 기록을 모아 봐요</h3>
-        <span className="muted">{state.students.length}명</span>
-      </div>
-      <div className="student-grid">
-        {sortStudents(state.students).map((s) => (
-          <a key={s.id} className="student-btn" href={`#students/${s.id}`}>
-            <span className="num">{s.number}</span>
-            <span className="nm">{s.name}</span>
-            {(counts.get(s.id) ?? 0) > 0 && <span className="muted small">기록 {counts.get(s.id)}</span>}
-          </a>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-type Adding = NoteKind | 'planned' | 'attendance' | 'pilsa' | 'incident';
+type Adding = NoteKind | 'planned' | 'attendance' | 'pilsa';
 
 /** [＋] 를 누르면 고르는 것 — 학생에 대해 남길 수 있는 모든 것이 여기 한 곳에 */
 const ADD_CHOICES: readonly { id: Adding; label: string; icon: IconName }[] = [
@@ -102,7 +66,6 @@ const ADD_CHOICES: readonly { id: Adding; label: string; icon: IconName }[] = [
   { id: 'planned', label: '상담 일정', icon: 'today' },
   { id: 'attendance', label: '출결', icon: 'check' },
   { id: 'pilsa', label: '필사 부여', icon: 'doc' },
-  { id: 'incident', label: '사안', icon: 'alert' },
 ];
 
 function StudentPage({ studentId }: { studentId: string }) {
@@ -115,7 +78,6 @@ function StudentPage({ studentId }: { studentId: string }) {
   const [adding, setAdding] = useState<Adding | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
-  const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [printing, setPrinting] = useState(false);
   const [hidden, setHidden] = usePrivacy();
 
@@ -136,7 +98,6 @@ function StudentPage({ studentId }: { studentId: string }) {
   );
   const notes = noteCounts(items);
   const pilsa = pilsaSummary(state.pilsa, studentId, from, to);
-  const incidents = items.filter((it) => it.type === 'incident').length;
   const planned = items
     .flatMap((it) => (it.type === 'note' && it.note.planned ? [it.note] : []))
     .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')));
@@ -149,7 +110,6 @@ function StudentPage({ studentId }: { studentId: string }) {
     { f: 'attendance', text: `결석 ${summary.absenceDays}일${lateEtc ? ` · 지각·조퇴 ${lateEtc}` : ''}` },
     ...NOTE_KINDS.filter((k) => notes[k] > 0).map((k) => ({ f: k as Filter, text: `${k} ${notes[k]}` })),
     ...(pilsa.pages ? [{ f: 'pilsa' as Filter, text: pilsa.remaining ? `필사 ${pilsa.remaining}장 남음` : `필사 ${pilsa.pages}장`, warn: pilsa.remaining > 0 }] : []),
-    ...(incidents ? [{ f: 'incident' as Filter, text: `사안 ${incidents}` }] : []),
     ...(notes.todo ? [{ f: 'todo' as Filter, text: `할 일 ${notes.todo}`, warn: true }] : []),
   ];
 
@@ -166,7 +126,7 @@ function StudentPage({ studentId }: { studentId: string }) {
   return (
     <div className={`student-page${hidden ? ' privacy' : ''}`}>
       <header className="page-head">
-        <a href="#students" className="icon-btn" aria-label="학생 목록">
+        <a href="#today" className="icon-btn" aria-label="오늘로">
           <Icon name="left" size={22} />
         </a>
         <h2 className="student-title">
@@ -237,7 +197,6 @@ function StudentPage({ studentId }: { studentId: string }) {
               studentId={studentId}
               onEditNote={setEditingNote}
               onEditRecord={setEditingRecord}
-              onEditIncident={setEditingIncident}
             />
           ))}
         </ul>
@@ -261,10 +220,8 @@ function StudentPage({ studentId }: { studentId: string }) {
       {adding === 'planned' && <NoteForm studentId={studentId} planned onClose={() => setAdding(null)} />}
       {adding === 'attendance' && <QuickEntry studentId={studentId} date={today()} onClose={() => setAdding(null)} />}
       {adding === 'pilsa' && <GiveForm studentId={studentId} onClose={() => setAdding(null)} />}
-      {adding === 'incident' && <IncidentForm studentId={studentId} onClose={() => setAdding(null)} />}
       {editingNote && <NoteForm initial={editingNote} studentId={studentId} onClose={() => setEditingNote(null)} />}
       {editingRecord && <RecordForm initial={editingRecord} onClose={() => setEditingRecord(null)} />}
-      {editingIncident && <IncidentForm initial={editingIncident} studentId={studentId} onClose={() => setEditingIncident(null)} />}
       {printing && (
         <PrintSheet onDone={() => setPrinting(false)}>
           <StudentPrint student={student} year={year} items={items} absence={summary.absenceDays} late={times('지각')} early={times('조퇴')} />
@@ -280,41 +237,24 @@ function TimelineRow({
   studentId,
   onEditNote,
   onEditRecord,
-  onEditIncident,
 }: {
   item: TimelineItem;
   studentId: string;
   onEditNote: (n: Note) => void;
   onEditRecord: (r: AttendanceRecord) => void;
-  onEditIncident: (i: Incident) => void;
 }) {
-  const { state } = useStore();
   if (item.type === 'attendance') return <RecordItem record={item.record} onEdit={() => onEditRecord(item.record)} />;
   if (item.type === 'note') return <NoteItem note={item.note} studentId={studentId} onEdit={() => onEditNote(item.note)} />;
-  if (item.type === 'pilsa') {
-    const t = item.task;
-    const left = t.pages - Math.min(t.submitted.length, t.pages);
-    return (
-      <li className="record">
-        <a className="record-main" href="#pilsa">
-          <span className="date">{formatKo(t.date)}</span>
-          <span className="tag k-pilsa">필사 {t.pages}장</span>
-          {t.reason && <span className="memo">{t.reason}</span>}
-          <span className={left ? 'late small' : 'muted small'}>{left ? `${left}장 남음` : '다 냄'}</span>
-        </a>
-      </li>
-    );
-  }
-  const i = item.incident;
-  const others = i.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id));
+  const t = item.task;
+  const left = t.pages - Math.min(t.submitted.length, t.pages);
   return (
     <li className="record">
-      <button className="record-main" onClick={() => onEditIncident(i)} title="눌러서 보기">
-        <span className="date">{formatKo(i.date)}</span>
-        <span className="tag k-incident">사안 · {i.status}</span>
-        <span className="private">{i.title}</span>
-        {others.length > 0 && <span className="memo">같이: {others.join(', ')}</span>}
-      </button>
+      <a className="record-main" href="#pilsa">
+        <span className="date">{formatKo(t.date)}</span>
+        <span className="tag k-pilsa">필사 {t.pages}장</span>
+        {t.reason && <span className="memo">{t.reason}</span>}
+        <span className={left ? 'late small' : 'muted small'}>{left ? `${left}장 남음` : '다 냄'}</span>
+      </a>
     </li>
   );
 }
@@ -378,8 +318,7 @@ function StudentPrint({
     .map((it) => {
       if (it.type === 'attendance') return [formatKo(it.date), '출결', `${recordTitle(it.record)}${it.record.memo ? ` (${it.record.memo})` : ''}`];
       if (it.type === 'note') return [formatKo(it.date), it.note.kind, it.note.content];
-      if (it.type === 'pilsa') return [formatKo(it.date), '필사', `${it.task.pages}장${it.task.reason ? ` · ${it.task.reason}` : ''}`];
-      return [formatKo(it.date), '사안', `${it.incident.title} (${it.incident.status})`];
+      return [formatKo(it.date), '필사', `${it.task.pages}장${it.task.reason ? ` · ${it.task.reason}` : ''}`];
     })
     .reverse();
   return (

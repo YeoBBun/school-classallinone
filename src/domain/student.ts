@@ -1,23 +1,21 @@
 /**
- * 학생 한 명에 대해 여러 곳에 적은 것(출결, 관찰·상담 기록, 필사, 사안)을 한데 모은다.
+ * 학생 한 명에 대해 여러 곳에 적은 것(출결, 관찰·상담 기록, 필사)을 한데 모은다.
  */
-import type { AppState, AttendanceRecord, BehaviorDraft, DateStr, Incident, Note, NoteKind, PilsaTask } from './types';
+import type { AppState, AttendanceRecord, BehaviorDraft, DateStr, Note, NoteKind, PilsaTask } from './types';
 
 export type TimelineItem =
   | { type: 'attendance'; date: DateStr; record: AttendanceRecord }
   | { type: 'note'; date: DateStr; note: Note }
-  | { type: 'pilsa'; date: DateStr; task: PilsaTask }
-  | { type: 'incident'; date: DateStr; incident: Incident };
+  | { type: 'pilsa'; date: DateStr; task: PilsaTask };
 
-export type TimelineSource = Pick<AppState, 'records' | 'notes' | 'pilsa' | 'incidents'>;
+export type TimelineSource = Pick<AppState, 'records' | 'notes' | 'pilsa'>;
 
-const TYPE_ORDER: Record<TimelineItem['type'], number> = { attendance: 0, incident: 1, note: 2, pilsa: 3 };
+const TYPE_ORDER: Record<TimelineItem['type'], number> = { attendance: 0, note: 1, pilsa: 2 };
 
 export function itemKey(it: TimelineItem): string {
   if (it.type === 'attendance') return 'r' + it.record.id;
   if (it.type === 'note') return 'n' + it.note.id;
-  if (it.type === 'pilsa') return 'p' + it.task.id;
-  return 'i' + it.incident.id;
+  return 'p' + it.task.id;
 }
 
 /** 학년도(from~to)에 걸친 그 학생의 기록을 최근 것부터 */
@@ -32,11 +30,8 @@ export function studentTimeline(studentId: string, s: TimelineSource, from: Date
     ...s.pilsa
       .filter((p) => p.studentId === studentId && p.date >= from && p.date <= to)
       .map((p) => ({ type: 'pilsa' as const, date: p.date, task: p })),
-    ...s.incidents
-      .filter((i) => i.studentIds.includes(studentId) && i.date >= from && i.date <= to)
-      .map((i) => ({ type: 'incident' as const, date: i.date, incident: i })),
   ];
-  // 같은 날이면 출결 → 사안 → 기록 → 필사, 기록끼리는 나중에 적은 것 먼저
+  // 같은 날이면 출결 → 기록 → 필사, 기록끼리는 나중에 적은 것 먼저
   return items.sort(
     (a, b) =>
       b.date.localeCompare(a.date) ||
@@ -55,7 +50,7 @@ export function noteCounts(items: TimelineItem[]): Record<NoteKind, number> & { 
   return c;
 }
 
-/** 검색어가 내용·후속 조치·보호자·출결 메모·필사 사유·사안 경과에 들어 있는가 */
+/** 검색어가 내용·후속 조치·보호자·출결 메모·필사 사유에 들어 있는가 */
 export function matchesQuery(it: TimelineItem, q: string): boolean {
   if (!q) return true;
   const text =
@@ -63,9 +58,7 @@ export function matchesQuery(it: TimelineItem, q: string): boolean {
       ? [it.note.content, it.note.followUp, it.note.parentWho, it.note.kind].join(' ')
       : it.type === 'attendance'
         ? [it.record.memo, it.record.kind, it.record.status, it.record.reason].join(' ')
-        : it.type === 'pilsa'
-          ? '필사 ' + it.task.reason
-          : [it.incident.title, ...it.incident.steps.map((s) => s.text)].join(' ');
+        : '필사 ' + it.task.reason;
   return text.includes(q);
 }
 
@@ -85,7 +78,6 @@ export function remapStudents(s: AppState, remap: Map<string, string>): AppState
     students: s.students.filter((st) => !remap.has(st.id)),
     records: s.records.map((r) => (remap.has(r.studentId) ? { ...r, studentId: to(r.studentId) } : r)),
     notes: s.notes.map((n) => (touched(n.studentIds) ? { ...n, studentIds: many(n.studentIds) } : n)),
-    incidents: s.incidents.map((i) => (touched(i.studentIds) ? { ...i, studentIds: many(i.studentIds) } : i)),
     pilsa: s.pilsa.map((p) => (remap.has(p.studentId) ? { ...p, studentId: to(p.studentId) } : p)),
     checklists: s.checklists.map((c) =>
       touched(Object.keys(c.marks)) ? { ...c, marks: Object.fromEntries(Object.entries(c.marks).map(([k, v]) => [to(k), v])) } : c,
@@ -95,7 +87,7 @@ export function remapStudents(s: AppState, remap: Map<string, string>): AppState
   };
 }
 
-/** 학생과 그 학생에 대한 기록을 모두 지운다. 여러 학생이 같이 있는 기록·사안은 그 학생만 뺀다 */
+/** 학생과 그 학생에 대한 기록을 모두 지운다. 여러 학생이 같이 있는 기록은 그 학생만 뺀다 */
 export function removeStudentData(s: AppState, id: string): AppState {
   const drop = (ids: string[]) => ids.filter((x) => x !== id);
   return {
@@ -105,7 +97,6 @@ export function removeStudentData(s: AppState, id: string): AppState {
     notes: s.notes
       .map((n) => (n.studentIds.includes(id) ? { ...n, studentIds: drop(n.studentIds) } : n))
       .filter((n) => n.studentIds.length > 0),
-    incidents: s.incidents.map((i) => (i.studentIds.includes(id) ? { ...i, studentIds: drop(i.studentIds) } : i)),
     pilsa: s.pilsa.filter((p) => p.studentId !== id),
     checklists: s.checklists.map((c) => {
       if (!(id in c.marks)) return c;
@@ -134,7 +125,6 @@ export function studentDataCount(s: AppState, id: string): number {
     s.records.filter((r) => r.studentId === id).length +
     s.notes.filter((n) => n.studentIds.includes(id)).length +
     s.pilsa.filter((p) => p.studentId === id).length +
-    s.incidents.filter((i) => i.studentIds.includes(id)).length +
     s.behavior.filter((b) => b.studentId === id).length
   );
 }

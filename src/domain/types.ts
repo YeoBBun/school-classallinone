@@ -153,30 +153,6 @@ export interface PilsaTask extends Stamped {
   submitted: DateStr[];
 }
 
-export const INCIDENT_STATUSES = ['진행 중', '관찰 중', '종결'] as const;
-export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
-export const INCIDENT_STEP_KINDS = ['인지', '학생 면담', '보호자 연락', '조치', '기타'] as const;
-export type IncidentStepKind = (typeof INCIDENT_STEP_KINDS)[number];
-
-export interface IncidentStep {
-  id: string;
-  date: DateStr;
-  kind: IncidentStepKind;
-  text: string;
-}
-
-/** 학급 내 사안 (다툼, 분실 등). 사실 위주로 경과를 적는다 */
-export interface Incident extends Stamped {
-  id: string;
-  title: string;
-  date: DateStr;
-  studentIds: string[];
-  status: IncidentStatus;
-  steps: IncidentStep[];
-  /** 학교폭력으로 이어질 수 있어 따로 챙길 사안 */
-  violence?: boolean;
-}
-
 /** 자리 배치 한 번. seats 는 교탁 쪽 첫 줄 왼쪽(학생이 칠판을 볼 때)부터 줄마다 */
 export interface SeatPlan extends Stamped {
   id: string;
@@ -252,7 +228,6 @@ export interface AppState {
   notes: Note[];
   checklists: Checklist[];
   pilsa: PilsaTask[];
-  incidents: Incident[];
   seatPlans: SeatPlan[];
   behavior: BehaviorDraft[];
   calendarLinks: CalendarLink[];
@@ -285,7 +260,6 @@ export function emptyState(): AppState {
     notes: [],
     checklists: [],
     pilsa: [],
-    incidents: [],
     seatPlans: [],
     behavior: [],
     calendarLinks: [],

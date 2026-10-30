@@ -3,7 +3,6 @@ import { BehaviorView } from './components/BehaviorView';
 import { ChecklistView } from './components/ChecklistView';
 import { Dashboard } from './components/Dashboard';
 import { FieldTripIntake } from './components/FieldTripIntake';
-import { IncidentsView } from './components/IncidentsView';
 import { NuggaView } from './components/NuggaView';
 import { PilsaView } from './components/PilsaView';
 import { SeatingView } from './components/SeatingView';
@@ -17,18 +16,19 @@ import { useGoogle } from './google/useGoogle';
 import { StoreProvider, useNeedBackup, useStore } from './store';
 import { isGithub, loadSyncConfig } from './sync/cloud';
 
-/** 아래(휴대폰)·위(PC) 메뉴는 셋만 둔다. 나머지는 «더보기» 안에 있다. 설정은 머리글의 톱니바퀴. */
-const TABS: readonly { id: 'today' | 'students' | 'more'; label: string; icon: IconName }[] = [
+/**
+ * 메뉴는 «오늘»과 «더보기» 둘. 매일 하는 일(출결, 학생 기록)은 오늘 화면에서 학생을 눌러 끝낸다.
+ * 설정은 머리글의 톱니바퀴.
+ */
+const TABS: readonly { id: 'today' | 'more'; label: string; icon: IconName }[] = [
   { id: 'today', label: '오늘', icon: 'today' },
-  { id: 'students', label: '학생', icon: 'people' },
   { id: 'more', label: '더보기', icon: 'grid' },
 ];
 
 /** «더보기» 안의 화면 (출결·생기부는 안에서 탭으로 나뉜다) */
-const MORE: readonly { id: 'checklists' | 'pilsa' | 'incidents' | 'seating' | 'nuga' | 'records'; label: string; icon: IconName }[] = [
+const MORE: readonly { id: 'checklists' | 'pilsa' | 'seating' | 'nuga' | 'records'; label: string; icon: IconName }[] = [
   { id: 'checklists', label: '제출물', icon: 'check' },
   { id: 'pilsa', label: '필사', icon: 'doc' },
-  { id: 'incidents', label: '사안', icon: 'alert' },
   { id: 'seating', label: '자리', icon: 'grid' },
   { id: 'nuga', label: '생기부', icon: 'pen' },
   { id: 'records', label: '출결', icon: 'list' },
@@ -42,8 +42,8 @@ const SUBTABS = {
   behavior: { group: '생기부', tabs: [{ id: 'nuga', label: '누가기록' }, { id: 'behavior', label: '행발' }] },
 } as const;
 
-type Page = (typeof TABS)[number]['id'] | (typeof MORE)[number]['id'] | 'stats' | 'behavior' | 'settings';
-const PAGES: readonly string[] = [...TABS.map((t) => t.id), ...MORE.map((m) => m.id), 'stats', 'behavior', 'settings'];
+type Page = (typeof TABS)[number]['id'] | (typeof MORE)[number]['id'] | 'students' | 'stats' | 'behavior' | 'settings';
+const PAGES: readonly string[] = [...TABS.map((t) => t.id), ...MORE.map((m) => m.id), 'students', 'stats', 'behavior', 'settings'];
 
 /** 예전 주소(#dashboard, #calendar)로 들어와도 맞는 화면을 연다. */
 const LEGACY: Record<string, Page> = { dashboard: 'stats', calendar: 'records' };
@@ -61,7 +61,8 @@ function Shell() {
   const [route, setRoute] = useState(readRoute);
   const needBackup = useNeedBackup();
   const { page, sub } = route;
-  const tab = TABS.some((t) => t.id === page) ? page : page === 'settings' ? null : 'more';
+  // 학생 기록은 오늘 화면에서 열리므로 «오늘»이 켜진 채로 둔다
+  const tab = page === 'today' || page === 'students' ? 'today' : page === 'settings' ? null : 'more';
 
   useEffect(() => {
     const onHash = () => {
@@ -106,14 +107,13 @@ function Shell() {
       {saveError && <div className="banner error">{saveError}</div>}
       <main>
         {tab === 'more' && page !== 'more' && <SubHead page={page} />}
-        {page === 'today' && <Today />}
-        {page === 'students' && <StudentsView studentId={sub} />}
+        {(page === 'today' || (page === 'students' && !sub)) && <Today />}
+        {page === 'students' && sub && <StudentsView studentId={sub} />}
         {page === 'more' && <MoreMenu />}
         {page === 'records' && <RecordList initialView={location.hash === '#calendar' ? 'calendar' : 'list'} />}
         {page === 'stats' && <Dashboard />}
         {page === 'checklists' && <ChecklistView />}
         {page === 'pilsa' && <PilsaView />}
-        {page === 'incidents' && <IncidentsView />}
         {page === 'seating' && <SeatingView />}
         {page === 'nuga' && <NuggaView />}
         {page === 'behavior' && <BehaviorView />}

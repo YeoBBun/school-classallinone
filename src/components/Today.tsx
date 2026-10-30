@@ -39,6 +39,7 @@ export function Today() {
   const { state, holidays } = useStore();
   const [date, setDate] = useState(today);
   const [entryFor, setEntryFor] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   const now = today();
   const holiday = holidays.get(date);
   const { main, weekday } = bigDate(date);
@@ -92,10 +93,10 @@ export function Today() {
         <div className="today-grid">
           <section className="card roster-card">
             <div className="card-head">
-              <h3>학생을 눌러 출결 입력</h3>
+              <h3>학생을 누르세요</h3>
               <span className="muted">{state.students.length}명</span>
             </div>
-            <RosterGrid date={date} records={todays} onPick={setEntryFor} />
+            <RosterGrid date={date} records={todays} onPick={setPicked} />
           </section>
 
           <aside className="today-side">
@@ -105,8 +106,35 @@ export function Today() {
         </div>
       )}
 
+      {picked && (
+        <StudentChoice
+          studentId={picked}
+          onAttendance={() => (setEntryFor(picked), setPicked(null))}
+          onClose={() => setPicked(null)}
+        />
+      )}
       {entryFor && <QuickEntry studentId={entryFor} date={date} onClose={() => setEntryFor(null)} />}
     </div>
+  );
+}
+
+/** 학생을 눌렀을 때: 출결 입력 / 학생 기록(관찰·상담·필사 등을 모아 보고 남기기) */
+function StudentChoice({ studentId, onAttendance, onClose }: { studentId: string; onAttendance: () => void; onClose: () => void }) {
+  const { state } = useStore();
+  const s = state.students.find((x) => x.id === studentId);
+  return (
+    <Modal title={studentLabel(s)} onClose={onClose}>
+      <div className="choice-grid two">
+        <button className="choice" onClick={onAttendance}>
+          <Icon name="today" size={28} />
+          출결
+        </button>
+        <a className="choice" href={`#students/${studentId}`} onClick={onClose}>
+          <Icon name="people" size={28} />
+          학생 기록
+        </a>
+      </div>
+    </Modal>
   );
 }
 

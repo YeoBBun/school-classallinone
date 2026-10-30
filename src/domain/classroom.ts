@@ -1,5 +1,5 @@
 /**
- * 학급 운영 모듈의 계산: 제출물, 필사, 사안, 행발 글자 수, 오늘 챙길 일.
+ * 학급 운영 모듈의 계산: 제출물, 필사, 행발 글자 수, 오늘 챙길 일.
  * 화면과 떨어뜨려 두고 테스트한다.
  */
 import { addDays } from './calendar';
@@ -90,7 +90,6 @@ export function newSchoolYear(s: AppState): AppState {
     notes: [],
     checklists: [],
     pilsa: [],
-    incidents: [],
     seatPlans: [],
     behavior: [],
     calendarLinks: [],
@@ -114,7 +113,6 @@ export interface TodoSummary {
   followUps: Note[];
   /** 아직 다 안 걷힌 제출물 (마감 가까운 순) */
   checklists: { checklist: Checklist; missing: number }[];
-  openIncidents: number;
   /** 필사를 다 안 낸 학생 수와 남은 장 수 */
   pilsaStudents: number;
   pilsaPages: number;
@@ -139,7 +137,6 @@ export function todoSummary(s: AppState, today: DateStr): TodoSummary {
     unwritten: planned.filter((n) => n.date < today).sort(byWhen),
     followUps: s.notes.filter((n) => n.followUp?.trim() && !n.followUpDone).sort((a, b) => a.date.localeCompare(b.date)),
     checklists,
-    openIncidents: s.incidents.filter((i) => i.status !== '종결').length,
     pilsaStudents: remaining.size,
     pilsaPages: [...remaining.values()].reduce((a, b) => a + b, 0),
   };

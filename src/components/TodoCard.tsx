@@ -11,7 +11,7 @@ import { NoteForm } from './NoteForm';
 import { RecordForm } from './RecordForm';
 import { nameOf } from './ui';
 
-/** 오늘 화면의 «챙길 일» 하나에 다: 받을 서류, 상담 일정, 할 일, 덜 걷힌 제출물, 진행 중 사안, 필사 */
+/** 오늘 화면의 «챙길 일» 하나에 다: 받을 서류, 상담 일정, 할 일, 덜 걷힌 제출물, 필사 */
 export function TodoCard() {
   const { state, update, holidays } = useStore();
   const now = today();
@@ -32,7 +32,7 @@ export function TodoCard() {
   const [planFor, setPlanFor] = useState<string | 'pick' | null>(null);
   const who = (n: Note) => n.studentIds.map((id) => nameOf(state.students, id)).join(', ');
   const empty =
-    !docs.length && !t.upcoming.length && !t.unwritten.length && !t.followUps.length && !t.checklists.length && !t.openIncidents && !t.pilsaStudents;
+    !docs.length && !t.upcoming.length && !t.unwritten.length && !t.followUps.length && !t.checklists.length && !t.pilsaStudents;
 
   return (
     <section className="card todo-card">
@@ -102,14 +102,6 @@ export function TodoCard() {
               </a>
             </li>
           ))}
-          {t.openIncidents > 0 && (
-            <li>
-              <a className="row-btn" href="#incidents">
-                <span className="who">사안</span>
-                <span className="detail">끝나지 않은 사안 {t.openIncidents}건</span>
-              </a>
-            </li>
-          )}
           {t.pilsaStudents > 0 && (
             <li>
               <a className="row-btn" href="#pilsa">
