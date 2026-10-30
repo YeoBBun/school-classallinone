@@ -52,7 +52,7 @@ export function SyncSettings() {
         잠가서 비공개 깃허브 저장소에 올려요. 토큰과 비밀번호는 <b>이 기기에만</b> 저장되고 백업 파일에는 들어가지 않아요.
       </p>
       {saved && <SyncLine status={sync} onRetry={syncNow} />}
-      {saved && widgetSync.kind === 'ok' && <p className="sync-status done">✓ {hhmm(widgetSync.at)} 휴대폰 위젯용 받을 서류 요약 올라가 있음</p>}
+      {saved && widgetSync.kind === 'ok' && <p className="sync-status done">✓ {hhmm(widgetSync.at)} 휴대폰 위젯용 처리 예정 요약 올라가 있음</p>}
       {saved && widgetSync.kind === 'error' && <p className="sync-status error">휴대폰 위젯용 요약을 못 올렸어요: {widgetSync.message}</p>}
       <div className="sync-form">
         <label>

@@ -37,12 +37,13 @@ class MainActivity : Activity() {
     }
 
     private fun describe(p: Prefs): String {
-        if (!p.configured) return "출결 앱에서 설정 → 휴대폰 ↔ PC 동기화를 연결하면 위젯도 같은 설정으로 받을 서류를 받아 와요."
+        if (!p.configured) return "학급관리 앱에서 설정 → 휴대폰 ↔ PC 동기화를 연결하면 위젯도 같은 설정으로 처리 예정을 받아 와요."
         val head = "동기화 저장소: ${p.repo}"
         p.error?.let { return "$head\n\n⚠ $it" }
         val s = p.summary() ?: return head
         val at = if (p.checkedAt > 0) DateFormat.format("M/d H:mm", p.checkedAt).toString() + " 확인 · " else ""
-        val body = if (s.items.isEmpty()) "✓ 받을 서류가 없어요." else "받을 서류 ${s.items.size}건"
-        return "$head\n\n$at$body\n\n홈 화면을 길게 눌러 위젯 → '받을 서류' 를 추가하세요."
+        val n = s.visible(java.time.LocalDate.now().toString()).sumOf { it.rows.size }
+        val body = if (n == 0) "✓ 처리할 것이 없어요." else "처리 예정 ${n}건"
+        return "$head\n\n$at$body\n\n홈 화면을 길게 눌러 위젯 → '처리 예정' 을 추가하세요."
     }
 }

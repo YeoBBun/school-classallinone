@@ -39,6 +39,36 @@ class PendingTest {
     }
 
     @Test
+    fun `예전 요약(items 만)은 출결 서류 묶음 하나로 보인다`() {
+        val s = Pending.parse(Pending.decrypt(fixture, "시험용 비밀번호"))
+        assertEquals(listOf("출결 서류"), s.sections.map { it.title })
+        assertEquals(3, s.sections[0].rows.size)
+        assertEquals("D-0", s.sections[0].rows[1].dday("2026-10-30"))
+    }
+
+    @Test
+    fun `묶음별 요약: 남은 날, 지난 일정 감추기, 기한 지난 것 위로`() {
+        val plain = """
+            {"format":"attendance-app/pending-v1","className":"2-3","items":[],"sections":[
+              {"title":"일정","rows":[
+                {"title":"김하늘","text":"학부모 상담","detail":"10/30(금) 15:00","on":"2026-10-30"},
+                {"title":"체육대회","text":"학급 행사","detail":"11/2(월)","on":"2026-11-02"}]},
+              {"title":"제출물","rows":[
+                {"title":"현장학습 동의서","text":"3명 안 냄","detail":"11/3(화)까지","due":"2026-11-03"},
+                {"title":"가정통신문","text":"1명 안 냄","detail":"10/28(수)까지","due":"2026-10-28"}]},
+              {"title":"필사","rows":[{"title":"필사","text":"2명이 5장 덜 냄"}]}]}
+        """.trimIndent()
+        val s = Pending.parse(plain)
+        assertEquals(listOf("D-0", "D-3"), s.sections[0].rows.map { it.dday("2026-10-30") })
+        val later = s.visible("2026-10-31")
+        assertEquals(listOf("체육대회"), later[0].rows.map { it.title })
+        assertEquals(listOf("가정통신문", "현장학습 동의서"), later[1].rows.map { it.title })
+        assertEquals("D+3", later[1].rows[0].dday("2026-10-31"))
+        assertEquals("", later[2].rows[0].dday("2026-10-31"))
+        assertTrue(s.visible("2026-11-03").none { it.title == "일정" })
+    }
+
+    @Test
     fun `깃허브에서 받고, sha 가 같으면 건너뛴다`() {
         // 깃허브는 base64 를 60자마다 줄바꿈해서 준다
         val b64 = Base64.getMimeEncoder(60, "\n".toByteArray()).encodeToString(fixture.toByteArray())
@@ -101,7 +131,7 @@ class PendingTest {
                 server.close()
             }
         }
-        assertTrue(serve(200).startsWith("아직 받을 서류 요약이 없어요"))
+        assertTrue(serve(200).startsWith("아직 처리 예정 요약이 없어요"))
         assertTrue(serve(404).startsWith("저장소를 찾지 못했어요"))
     }
 }

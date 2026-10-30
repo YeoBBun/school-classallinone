@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { formatKo, schoolYearOf, schoolYearRange, today } from '../domain/calendar';
 import { checklistProgress, neisBytes, pilsaSummary } from '../domain/classroom';
 import { summarize } from '../domain/stats';
-import { matchesQuery, studentTimeline, type TimelineItem } from '../domain/student';
+import { matchesQuery, stampLine, studentTimeline, type TimelineItem } from '../domain/student';
 import { KINDS, NOTE_KINDS, STATUSES, type AttendanceRecord, type Note, type NoteKind, type Student } from '../domain/types';
 import { useStore } from '../store';
 import { Modal, recordDates, recordTitle } from './common';
@@ -242,6 +242,7 @@ function StudentPage({ studentId }: { studentId: string }) {
                       {n.studentIds.length > 1 && ` · 같이: ${n.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id)).join(', ')}`}
                     </span>
                     <span className="text private">{n.content}</span>
+                    {stampLine(n) && <span className="stamp">{stampLine(n)}</span>}
                   </span>
                 </button>
               </li>
@@ -264,6 +265,7 @@ function StudentPage({ studentId }: { studentId: string }) {
                       <span className="kind">같이: {n.studentIds.filter((id) => id !== studentId).map((id) => nameOf(state.students, id)).join(', ')}</span>
                     )}
                     <span className="text private">{n.content}</span>
+                    {stampLine(n) && <span className="stamp">{stampLine(n)}</span>}
                   </span>
                 </button>
               </li>
@@ -385,7 +387,7 @@ function StudentPrint({
     .filter((it) => !(it.type === 'note' && it.note.planned))
     .map((it) => {
       if (it.type === 'attendance') return [formatKo(it.date), '출결', `${recordTitle(it.record)}${it.record.memo ? ` (${it.record.memo})` : ''}`];
-      if (it.type === 'note') return [formatKo(it.date), it.note.kind, it.note.content];
+      if (it.type === 'note') return [formatKo(it.date), it.note.kind, it.note.content, stampLine(it.note)];
       return [formatKo(it.date), '필사', `${it.task.pages}장${it.task.reason ? ` · ${it.task.reason}` : ''}`];
     })
     .reverse();
@@ -410,7 +412,10 @@ function StudentPrint({
             <tr key={i}>
               <td>{r[0]}</td>
               <td>{r[1]}</td>
-              <td className="pre">{r[2]}</td>
+              <td className="pre">
+                {r[2]}
+                {r[3] && <div className="print-stamp">{r[3]}</div>}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -1,6 +1,7 @@
 /**
  * 학생 한 명에 대해 여러 곳에 적은 것(출결, 관찰·상담 기록, 필사)을 한데 모은다.
  */
+import { formatStamp } from './calendar';
 import type { AppState, AttendanceRecord, BehaviorDraft, DateStr, Note, NoteKind, PilsaTask } from './types';
 
 export type TimelineItem =
@@ -127,4 +128,34 @@ export function studentDataCount(s: AppState, id: string): number {
     s.pilsa.filter((p) => p.studentId === id).length +
     s.behavior.filter((b) => b.studentId === id).length
   );
+}
+
+/**
+ * 기록을 저장할 때 작성·수정 시각을 붙인다. 이미 적힌 기록의 내용이나 날짜가 바뀌면
+ * 바뀌기 전 판을 history 에 남긴다 (고쳐도 처음 적은 내용과 시각이 지워지지 않게).
+ * 상담 일정(planned)은 아직 기록이 아니라서 시각을 붙이지 않는다.
+ */
+export function withWriteLog(prev: Note | undefined, next: Note, at: string): Note {
+  if (next.planned) return next;
+  if (!prev || prev.planned) return { ...next, writtenAt: at };
+  const keep: Partial<Note> = {
+    ...(prev.writtenAt ? { writtenAt: prev.writtenAt } : {}),
+    ...(prev.editedAt ? { editedAt: prev.editedAt } : {}),
+    ...(prev.history?.length ? { history: prev.history } : {}),
+  };
+  if (prev.content === next.content && prev.date === next.date) return { ...next, ...keep };
+  const was = prev.editedAt ?? prev.writtenAt ?? prev.updatedAt;
+  return {
+    ...next,
+    ...keep,
+    editedAt: at,
+    history: [...(prev.history ?? []), { ...(was ? { at: was } : {}), date: prev.date, content: prev.content }],
+  };
+}
+
+/** 예: 작성 2026.10.30 14:32 · 수정 2026.10.31 09:10. 이 기능 전 기록은 마지막 저장 시각 */
+export function stampLine(n: Note): string {
+  if (n.writtenAt) return `작성 ${formatStamp(n.writtenAt)}${n.editedAt ? ` · 수정 ${formatStamp(n.editedAt)}` : ''}`;
+  if (n.planned || !n.updatedAt) return '';
+  return `저장 ${formatStamp(n.updatedAt)}${n.editedAt ? ` · 수정 ${formatStamp(n.editedAt)}` : ''}`;
 }

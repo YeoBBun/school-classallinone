@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { addDays, formatKo, today } from '../domain/calendar';
+import { addDays, formatKo, formatStamp, today } from '../domain/calendar';
+import { stampLine, withWriteLog } from '../domain/student';
 import { NOTE_KINDS, PARENT_METHODS, type Note, type NoteKind } from '../domain/types';
 import { newId, useStore } from '../store';
 import { Modal } from './common';
@@ -49,7 +50,7 @@ export function NoteForm({
 
   const save = () => {
     if (!planned && !draft.content.trim()) return setError('내용을 적어 주세요.');
-    const note: Note = {
+    const note: Note = withWriteLog(initial, {
       ...draft,
       content: draft.content.trim(),
       followUp: draft.followUp?.trim() || undefined,
@@ -58,7 +59,7 @@ export function NoteForm({
       parentMethod: parent ? draft.parentMethod : undefined,
       planned: planned || undefined,
       time: parent ? draft.time || undefined : undefined,
-    };
+    }, new Date().toISOString());
     update((s) => ({
       ...s,
       notes: isNew ? [...s.notes, note] : s.notes.map((n) => (n.id === note.id ? note : n)),
@@ -86,6 +87,27 @@ export function NoteForm({
               ))}
             </div>
           </section>
+        )}
+
+        {initial && !initial.planned && stampLine(initial) && (
+          <div className="note-stamp">
+            <span>{stampLine(initial)}</span>
+            {!!initial.history?.length && (
+              <details>
+                <summary>고치기 전 내용 {initial.history.length}개</summary>
+                <ol className="note-history">
+                  {[...initial.history].reverse().map((v, i) => (
+                    <li key={i}>
+                      <span className="muted">
+                        {v.at ? `${formatStamp(v.at)} 저장` : '저장 시각 모름'} · {formatKo(v.date)} 기록
+                      </span>
+                      <p>{v.content}</p>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </div>
         )}
 
         {planned && !isNew && (

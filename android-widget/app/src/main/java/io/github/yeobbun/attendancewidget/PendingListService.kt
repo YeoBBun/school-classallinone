@@ -6,12 +6,16 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import java.time.LocalDate
 
-/** 위젯 목록의 줄들 */
+/** 위젯 목록의 줄들: 묶음 제목(출결 서류·일정…)과 그 아래 줄 */
 class PendingListService : RemoteViewsService() {
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory = Factory(applicationContext)
 
+    private sealed interface Entry
+    private class Header(val title: String, val count: Int) : Entry
+    private class Row(val row: PlanRow) : Entry
+
     private class Factory(private val ctx: Context) : RemoteViewsFactory {
-        private var items: List<PendingItem> = emptyList()
+        private var entries: List<Entry> = emptyList()
         private var today = ""
 
         override fun onCreate() {}
@@ -19,24 +23,37 @@ class PendingListService : RemoteViewsService() {
 
         override fun onDataSetChanged() {
             today = LocalDate.now().toString()
-            items = Prefs(ctx).summary()?.sorted(today) ?: emptyList()
+            val sections = Prefs(ctx).summary()?.visible(today) ?: emptyList()
+            entries = sections.flatMap { s -> listOf<Entry>(Header(s.title, s.rows.size)) + s.rows.map { Row(it) } }
         }
 
-        override fun getCount() = items.size
-        override fun getViewTypeCount() = 1
+        override fun getCount() = entries.size
+        override fun getViewTypeCount() = 2
         override fun hasStableIds() = false
         override fun getItemId(position: Int) = position.toLong()
         override fun getLoadingView(): RemoteViews? = null
 
-        override fun getViewAt(position: Int): RemoteViews {
-            val it = items[position]
-            val v = RemoteViews(ctx.packageName, R.layout.widget_item)
-            v.setTextViewText(R.id.who, it.who)
-            v.setTextViewText(R.id.doc, it.doc)
-            v.setTextViewText(R.id.detail, it.detail(today))
-            v.setTextColor(R.id.detail, ctx.getColor(if (it.overdue(today)) R.color.overdue else R.color.muted))
-            v.setOnClickFillInIntent(R.id.row, Intent())
-            return v
+        override fun getViewAt(position: Int): RemoteViews = when (val e = entries[position]) {
+            is Header -> RemoteViews(ctx.packageName, R.layout.widget_header).apply {
+                setTextViewText(R.id.header_title, e.title)
+                setTextViewText(R.id.header_count, if (e.title == "필사") "" else e.count.toString())
+                setOnClickFillInIntent(R.id.header, Intent())
+            }
+            is Row -> RemoteViews(ctx.packageName, R.layout.widget_item).apply {
+                val r = e.row
+                val color = when {
+                    r.overdue(today) -> R.color.overdue
+                    r.isToday(today) -> R.color.accent
+                    else -> R.color.muted
+                }
+                setTextViewText(R.id.dday, r.dday(today))
+                setTextColor(R.id.dday, ctx.getColor(color))
+                setTextViewText(R.id.who, r.title)
+                setTextViewText(R.id.doc, r.text)
+                setTextViewText(R.id.detail, r.line2(today))
+                setTextColor(R.id.detail, ctx.getColor(if (r.overdue(today)) R.color.overdue else R.color.muted))
+                setOnClickFillInIntent(R.id.row, Intent())
+            }
         }
     }
 }

@@ -128,6 +128,20 @@ export interface Note extends Stamped {
   time?: string;
   /** 나이스 누가기록에 옮겨 적었는가 */
   neisDone?: boolean;
+  /** 기록을 처음 저장한 시각 (ISO, 이 기기 시계). 상담 일정은 결과를 적어 저장한 때. 이 기능 전 기록에는 없다 */
+  writtenAt?: string;
+  /** 내용·날짜를 마지막으로 고친 시각 (ISO) */
+  editedAt?: string;
+  /** 고치기 전 내용들 (오래된 것부터). 고쳐도 원래 내용이 남는다 */
+  history?: NoteVersion[];
+}
+
+/** 고치기 전의 기록 한 판 */
+export interface NoteVersion {
+  /** 이 판을 저장한 시각 (ISO). 모르면 없음 */
+  at?: string;
+  date: DateStr;
+  content: string;
 }
 
 /** 제출물·회신 체크 (가정통신문 회신, 동의서 등) */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AttendanceRecord, Note } from './types';
-import { itemKey, matchesQuery, noteCounts, studentTimeline } from './student';
+import { itemKey, matchesQuery, noteCounts, studentTimeline, withWriteLog } from './student';
 
 const rec = (id: string, startDate: string, studentId = 's1'): AttendanceRecord => ({
   id, studentId, status: '결석', kind: '질병', startDate, endDate: startDate, docs: [], memo: '감기',
@@ -55,5 +55,45 @@ describe('학생 한눈에 보기', () => {
     expect(matchesQuery(n, '진로')).toBe(true);
     expect(matchesQuery(r, '감기')).toBe(true);
     expect(matchesQuery(r, '진로')).toBe(false);
+  });
+});
+
+describe('기록 작성 시각', () => {
+  const t1 = '2026-10-30T05:32:00.000Z';
+  const t2 = '2026-10-31T00:10:00.000Z';
+  const t3 = '2026-11-01T01:00:00.000Z';
+
+  it('새 기록에 작성 시각, 상담 일정에는 없음, 일정이 끝난 상담이 되면 그때', () => {
+    expect(withWriteLog(undefined, note('a', '2026-10-30', { content: '도움' }), t1).writtenAt).toBe(t1);
+    const plan = note('b', '2026-11-02', { kind: '학부모상담', planned: true });
+    expect(withWriteLog(undefined, plan, t1).writtenAt).toBeUndefined();
+    expect(withWriteLog(plan, { ...plan, planned: undefined, content: '결과' }, t2).writtenAt).toBe(t2);
+  });
+
+  it('고치면 수정 시각과 고치기 전 판이 남고, 작성 시각은 그대로', () => {
+    const a = withWriteLog(undefined, note('a', '2026-10-30', { content: '처음' }), t1);
+    const b = withWriteLog(a, { ...a, content: '고침' }, t2);
+    expect(b).toMatchObject({ writtenAt: t1, editedAt: t2, content: '고침' });
+    expect(b.history).toEqual([{ at: t1, date: '2026-10-30', content: '처음' }]);
+    const c = withWriteLog(b, { ...b, date: '2026-10-29' }, t3);
+    expect(c.history).toEqual([
+      { at: t1, date: '2026-10-30', content: '처음' },
+      { at: t2, date: '2026-10-30', content: '고침' },
+    ]);
+  });
+
+  it('내용·날짜가 그대로면 (할 일만 바꿔도) 수정으로 치지 않는다', () => {
+    const a = withWriteLog(undefined, note('a', '2026-10-30', { content: '처음' }), t1);
+    const b = withWriteLog(a, { ...a, followUp: '다시 면담' }, t2);
+    expect(b.editedAt).toBeUndefined();
+    expect(b.history).toBeUndefined();
+  });
+
+  it('고치는 화면이 시각을 지운 채 넘겨도 원래 시각과 이전 판을 지킨다', () => {
+    const a = withWriteLog(undefined, note('a', '2026-10-30', { content: '처음' }), t1);
+    const b = withWriteLog(a, { ...a, content: '고침' }, t2);
+    const c = withWriteLog(b, { ...note('a', '2026-10-30'), content: '또 고침' }, t3);
+    expect(c.writtenAt).toBe(t1);
+    expect(c.history?.map((v) => v.content)).toEqual(['처음', '고침']);
   });
 });

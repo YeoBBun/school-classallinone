@@ -1,23 +1,19 @@
 import { useMemo, useState } from 'react';
 import { formatKo, today } from '../domain/calendar';
-import { todoSummary } from '../domain/classroom';
-import { pendingDocs, shortTitle } from '../domain/pending';
+import { shortTitle } from '../domain/pending';
+import { dday, planSections, type PlanRow } from '../domain/plan';
 import { DOC_FT_REPORT } from '../domain/rules';
-import type { AttendanceRecord, Note } from '../domain/types';
+import type { AttendanceRecord, DateStr, Note } from '../domain/types';
 import { useStore } from '../store';
 import { NoteForm } from './NoteForm';
 import { RecordForm } from './RecordForm';
 import { nameOf } from './ui';
 
-/** 오늘 화면의 «처리할 일» 하나에 다: 받을 서류, 다가오는 일정(상담·학급), 할 일, 덜 걷힌 제출물, 필사. 일정 추가는 더보기 → 일정 */
+/** 오늘 화면의 «처리 예정»: 출결 서류 · 일정 · 제출물 · 할 일 · 필사를 종류별로. 일정 추가는 더보기 → 일정 */
 export function TodoCard() {
   const { state, update, holidays } = useStore();
   const now = today();
-  const t = useMemo(() => todoSummary(state, now), [state, now]);
-  const docs = useMemo(() => {
-    const overdue = (d?: string) => (d && d < now ? 0 : 1);
-    return pendingDocs(state, holidays).sort((a, b) => overdue(a.deadline) - overdue(b.deadline));
-  }, [state, holidays, now]);
+  const sections = useMemo(() => planSections(state, holidays, now), [state, holidays, now]);
   const [open, setOpen] = useState<Note | null>(null);
   const [record, setRecord] = useState<AttendanceRecord | null>(null);
   const receive = (recordId: string, key: string) =>
@@ -28,95 +24,122 @@ export function TodoCard() {
       ),
     }));
   const who = (n: Note) => n.studentIds.map((id) => nameOf(state.students, id)).join(', ');
-  const empty =
-    !docs.length && !t.upcoming.length && !t.events.length && !t.unwritten.length && !t.followUps.length && !t.checklists.length && !t.pilsaStudents;
+  const day = (d: DateStr) => (d === now ? '오늘' : formatKo(d));
+  const badge = (d: DateStr) => <span className={`dday${d < now ? ' over' : d === now ? ' today' : ''}`}>{dday(d, now)}</span>;
+
+  const hasDate = (r: PlanRow) => (r.type === 'doc' && !!r.deadline) || (r.type === 'checklist' && !!r.checklist.dueDate);
+  /** pad: 같은 묶음에 D-day 가 있는 줄이 있으면 날짜 없는 줄도 그만큼 비워 줄을 맞춘다 */
+  const row = (r: PlanRow, pad: boolean) => {
+    switch (r.type) {
+      case 'doc': {
+        const over = !!r.deadline && r.deadline < now;
+        return (
+          <li key={r.record.id + r.doc.key} className={over ? 'over' : ''}>
+            {r.deadline ? badge(r.deadline) : pad && <span className="dday none" />}
+            <button className="row-btn" onClick={() => setRecord(r.record)}>
+              <span className="who">{nameOf(state.students, r.record.studentId)}</span>
+              <span className="detail">
+                {r.doc.label} · {formatKo(r.record.startDate)} {shortTitle(r.record)}
+                {r.doc.key === DOC_FT_REPORT && now <= r.record.endDate && ' · 다녀온 후'}
+                {r.deadline && ` · ${formatKo(r.deadline)}까지`}
+              </span>
+            </button>
+            <button className="small" onClick={() => receive(r.record.id, r.doc.key)}>
+              받음
+            </button>
+          </li>
+        );
+      }
+      case 'consult':
+        return (
+          <li key={r.note.id}>
+            {badge(r.note.date)}
+            <button className="row-btn" onClick={() => setOpen(r.note)}>
+              <span className="who">{who(r.note)}</span>
+              <span className="detail">
+                학부모 상담{r.note.parentWho ? ` (${r.note.parentWho})` : ''} · {day(r.note.date)} {r.note.time}
+              </span>
+            </button>
+          </li>
+        );
+      case 'event':
+        return (
+          <li key={r.event.id}>
+            {badge(r.event.date)}
+            <a className="row-btn" href="#schedule">
+              <span className="who">{r.event.title}</span>
+              <span className="detail">
+                {r.event.kind} · {day(r.event.date)} {r.event.time}
+              </span>
+            </a>
+          </li>
+        );
+      case 'checklist': {
+        const due = r.checklist.dueDate;
+        return (
+          <li key={r.checklist.id} className={due && due < now ? 'over' : ''}>
+            {due ? badge(due) : pad && <span className="dday none" />}
+            <a className="row-btn" href="#checklists">
+              <span className="who">{r.checklist.title}</span>
+              <span className="detail">
+                {r.missing}명 안 냄{due ? ` · ${formatKo(due)}까지` : ''}
+              </span>
+            </a>
+          </li>
+        );
+      }
+      case 'unwritten':
+        return (
+          <li key={r.note.id} className="over">
+            <button className="row-btn" onClick={() => setOpen(r.note)}>
+              <span className="who">{who(r.note)}</span>
+              <span className="detail">
+                {formatKo(r.note.date)} 학부모 상담 — <b>결과 적기</b>
+              </span>
+            </button>
+          </li>
+        );
+      case 'followUp':
+        return (
+          <li key={`f${r.note.id}`}>
+            <label className="follow-up">
+              <input
+                type="checkbox"
+                onChange={() => update((s) => ({ ...s, notes: s.notes.map((x) => (x.id === r.note.id ? { ...x, followUpDone: true } : x)) }))}
+              />
+              <span className="who">{who(r.note)}</span> {r.note.followUp}
+            </label>
+          </li>
+        );
+      case 'pilsa':
+        return (
+          <li key="pilsa">
+            <a className="row-btn" href="#pilsa">
+              <span className="detail">
+                {r.students}명이 {r.pages}장 덜 냄
+              </span>
+            </a>
+          </li>
+        );
+    }
+  };
 
   return (
     <section className="card todo-card">
       <div className="card-head">
-        <h3>처리할 일</h3>
+        <h3>처리 예정</h3>
       </div>
-      {empty ? (
-        <p className="muted">처리할 일이 없어요.</p>
+      {sections.length === 0 ? (
+        <p className="muted">처리할 것이 없어요.</p>
       ) : (
-        <ul className="todo-list">
-          {docs.map(({ record: r, doc, deadline }) => (
-            <li key={r.id + doc.key} className={deadline && deadline < now ? 'over' : ''}>
-              <button className="row-btn" onClick={() => setRecord(r)}>
-                <span className="who">{nameOf(state.students, r.studentId)}</span>
-                <span className="detail">
-                  {doc.label} 받기 · {formatKo(r.startDate)} {shortTitle(r)}
-                  {doc.key === DOC_FT_REPORT && now <= r.endDate && ' · 다녀온 후'}
-                  {deadline && ` · ${formatKo(deadline)}까지`}
-                </span>
-              </button>
-              <button className="small" onClick={() => receive(r.id, doc.key)}>
-                받음
-              </button>
-            </li>
-          ))}
-          {t.unwritten.map((n) => (
-            <li key={n.id} className="over">
-              <button className="row-btn" onClick={() => setOpen(n)}>
-                <span className="who">{who(n)}</span>
-                <span className="detail">
-                  {formatKo(n.date)} 학부모 상담 — <b>결과 적기</b>
-                </span>
-              </button>
-            </li>
-          ))}
-          {t.upcoming.map((n) => (
-            <li key={n.id}>
-              <button className="row-btn" onClick={() => setOpen(n)}>
-                <span className="who">{who(n)}</span>
-                <span className="detail">
-                  {n.date === now ? '오늘' : formatKo(n.date)} {n.time} 학부모 상담{n.parentWho ? ` (${n.parentWho})` : ''}
-                </span>
-              </button>
-            </li>
-          ))}
-          {t.events.map((e) => (
-            <li key={e.id}>
-              <a className="row-btn" href="#schedule">
-                <span className="who">{e.kind}</span>
-                <span className="detail">
-                  {e.date === now ? '오늘' : formatKo(e.date)} {e.time} {e.title}
-                </span>
-              </a>
-            </li>
-          ))}
-          {t.followUps.map((n) => (
-            <li key={n.id}>
-              <label className="follow-up">
-                <input
-                  type="checkbox"
-                  onChange={() => update((s) => ({ ...s, notes: s.notes.map((x) => (x.id === n.id ? { ...x, followUpDone: true } : x)) }))}
-                />
-                <span className="who">{who(n)}</span> {n.followUp}
-              </label>
-            </li>
-          ))}
-          {t.checklists.map(({ checklist: c, missing }) => (
-            <li key={c.id} className={c.dueDate && c.dueDate < now ? 'over' : ''}>
-              <a className="row-btn" href="#checklists">
-                <span className="who">{c.title}</span>
-                <span className="detail">
-                  {missing}명 안 냄{c.dueDate ? ` · ${formatKo(c.dueDate)}까지` : ''}
-                </span>
-              </a>
-            </li>
-          ))}
-          {t.pilsaStudents > 0 && (
-            <li>
-              <a className="row-btn" href="#pilsa">
-                <span className="who">필사</span>
-                <span className="detail">
-                  {t.pilsaStudents}명이 {t.pilsaPages}장 덜 냄
-                </span>
-              </a>
-            </li>
-          )}
-        </ul>
+        sections.map((s) => (
+          <div key={s.title} className="plan-group">
+            <h4 className="plan-head">
+              {s.title} <span>{s.title === '필사' ? '' : s.rows.length}</span>
+            </h4>
+            <ul className="todo-list">{s.rows.map((r) => row(r, s.rows.some(hasDate)))}</ul>
+          </div>
+        ))
       )}
 
       {open && <NoteForm initial={open} studentId={open.studentIds[0]} onClose={() => setOpen(null)} />}

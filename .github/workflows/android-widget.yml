@@ -1,6 +1,6 @@
 name: Android widget
 
-# 휴대폰 '받을 서류' 위젯 앱(android-widget/)을 빌드한다.
+# 휴대폰 '처리 예정' 위젯 앱(android-widget/)을 빌드한다.
 # 기본 브랜치에 올라가거나 직접 실행하면 Releases 의 'widget-latest' 에 APK 를 올린다.
 on:
   push:
@@ -63,6 +63,6 @@ jobs:
             gh release upload widget-latest attendance-widget.apk --clobber
           else
             gh release create widget-latest attendance-widget.apk --prerelease \
-              --title "받을 서류 위젯 (안드로이드)" \
+              --title "처리 예정 위젯 (안드로이드)" \
               --notes "휴대폰에서 attendance-widget.apk 를 받아 설치하세요. 설치 방법은 android-widget/README.md 참고."
           fi

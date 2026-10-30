@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { indexHolidays } from './calendar';
-import { widgetSummary } from './pending';
+import { widgetSummary } from './widget';
 import { rebuildDocs } from './rules';
 import { DEFAULT_SETTINGS, emptyState, type AppState, type AttendanceRecord } from './types';
 
@@ -40,7 +40,7 @@ describe('위젯 요약', () => {
       fieldTrip: { abroad: false, guardianAccompanied: true },
     });
     const ill = rec({ id: 'i', startDate: '2026-10-20', kind: '미인정' });
-    const s = widgetSummary(stateOf([trip, ill]), indexHolidays([]));
+    const s = widgetSummary(stateOf([trip, ill]), indexHolidays([]), '2026-10-21');
     expect(s.className).toBe('2-3');
     expect(s.items[0]).toEqual({ who: '3. 김하늘', doc: '출력물 학생 서명', what: '10/20(화) 미인정결석' });
     expect(s.items.slice(1).map((i) => [i.what, i.deadline, i.tripEnd])).toEqual([
@@ -52,6 +52,6 @@ describe('위젯 요약', () => {
   it('받은 서류는 빠진다', () => {
     const r = rec({ id: 'i', startDate: '2026-10-20', kind: '미인정' });
     r.docs = r.docs.map((d) => ({ ...d, received: true }));
-    expect(widgetSummary(stateOf([r]), indexHolidays([])).items).toEqual([]);
+    expect(widgetSummary(stateOf([r]), indexHolidays([]), '2026-10-21').items).toEqual([]);
   });
 });

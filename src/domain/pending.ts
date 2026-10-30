@@ -1,7 +1,7 @@
 /**
- * 아직 받지 않은 필수 서류 목록 — 오늘 화면의 '받아야 할 서류'와 휴대폰 위젯이 같이 쓴다.
+ * 아직 받지 않은 필수 서류 목록 — 오늘 화면 «처리 예정»의 출결 서류와 휴대폰 위젯이 같이 쓴다.
  */
-import { formatKo, type HolidayIndex } from './calendar';
+import type { HolidayIndex } from './calendar';
 import { applicationDeadline, DOC_FT_APPLICATION, DOC_FT_REPORT, missingDocs, reportDeadline } from './rules';
 import { KIND_SHORT, type AppState, type AttendanceRecord, type DateStr, type DocItem } from './types';
 
@@ -34,45 +34,4 @@ export function shortTitle(r: AttendanceRecord): string {
 export function studentName(state: AppState, id: string): string {
   const s = state.students.find((x) => x.id === id);
   return s ? `${s.number}. ${s.name}` : '?';
-}
-
-// ─── 휴대폰 위젯용 요약 ──────────────────────────────────
-
-export const WIDGET_FORMAT = 'attendance-app/pending-v1';
-
-export interface WidgetItem {
-  /** 예: 3. 김하늘 */
-  who: string;
-  /** 예: 결석계 */
-  doc: string;
-  /** 예: 10/21(화) 질병결석 */
-  what: string;
-  /** 기한 (체험학습 신청서·보고서). 지나면 위젯에서 빨갛게 위로 올린다 */
-  deadline?: DateStr;
-  /** 체험학습 보고서: 이 날까지는 '다녀온 후'로 표시 */
-  tripEnd?: DateStr;
-}
-
-export interface WidgetSummary {
-  format: typeof WIDGET_FORMAT;
-  className: string;
-  items: WidgetItem[];
-}
-
-/**
- * 위젯에 보여줄 받을 서류 요약. 오늘 날짜에 따라 바뀌는 것(기한 지남, 다녀온 후)은 위젯이 계산하므로
- * 출결 데이터가 그대로면 요약도 그대로다 — 바뀔 때만 올린다.
- */
-export function widgetSummary(state: AppState, holidays: HolidayIndex): WidgetSummary {
-  return {
-    format: WIDGET_FORMAT,
-    className: state.settings.className,
-    items: pendingDocs(state, holidays).map(({ record, doc, deadline }) => ({
-      who: studentName(state, record.studentId),
-      doc: doc.label,
-      what: `${formatKo(record.startDate)} ${shortTitle(record)}`,
-      ...(deadline ? { deadline } : {}),
-      ...(doc.key === DOC_FT_REPORT ? { tripEnd: record.endDate } : {}),
-    })),
-  };
 }

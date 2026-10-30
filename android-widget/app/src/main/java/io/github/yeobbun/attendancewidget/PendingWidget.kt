@@ -9,8 +9,9 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.DateFormat
 import android.widget.RemoteViews
+import java.time.LocalDate
 
-/** 홈 화면 위젯: 받아야 할 서류 */
+/** 홈 화면 위젯: 처리 예정 (출결 서류·일정·제출물·할 일·필사) */
 class PendingWidget : AppWidgetProvider() {
     override fun onUpdate(ctx: Context, mgr: AppWidgetManager, ids: IntArray) {
         render(ctx, mgr, ids)
@@ -49,7 +50,7 @@ class PendingWidget : AppWidgetProvider() {
         private fun render(ctx: Context, mgr: AppWidgetManager, ids: IntArray, checking: Boolean = false) {
             val p = Prefs(ctx)
             val summary = p.summary()
-            val count = summary?.items?.size
+            val count = summary?.visible(LocalDate.now().toString())?.sumOf { it.rows.size }
 
             val openApp = PendingIntent.getActivity(
                 ctx, 0, Intent(ctx, WebAppActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
@@ -73,9 +74,9 @@ class PendingWidget : AppWidgetProvider() {
                 else -> ""
             }
             val empty = when {
-                !p.configured -> "눌러서 출결 앱 설정 → 동기화를 연결해 주세요"
+                !p.configured -> "눌러서 학급관리 앱 설정 → 동기화를 연결해 주세요"
                 summary == null -> p.error ?: "불러오는 중…"
-                else -> "✓ 모두 받았어요"
+                else -> "✓ 처리할 것이 없어요"
             }
 
             for (id in ids) {

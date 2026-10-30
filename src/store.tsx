@@ -4,7 +4,7 @@ import { computeWarnings, type DocContext } from './domain/rules';
 import type { AppState } from './domain/types';
 import { androidApp } from './platform/android';
 import { loadState, requestPersistence, saveState } from './storage/db';
-import { widgetSummary } from './domain/pending';
+import { widgetSummary } from './domain/widget';
 import { applyCalendar } from './google/calendarSync';
 import { onGoogleChange } from './google/google';
 import { isGithub, loadSyncConfig, pushPending, syncNow } from './sync/cloud';
@@ -29,7 +29,7 @@ interface Store {
   sync: SyncStatus;
   /** 지금 바로 맞추기 (설정을 바꾼 뒤 등) */
   syncNow: () => void;
-  /** 휴대폰 위젯용 받을 서류 요약을 올린 결과 */
+  /** 휴대폰 위젯용 처리 예정 요약을 올린 결과 */
   widgetSync: WidgetSyncStatus;
   /** 구글 캘린더에 일정을 맞춘 결과 */
   calendar: WidgetSyncStatus;
@@ -160,7 +160,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTimeout(() => void runCalendar(), 300);
       // 휴대폰 위젯용 요약 — 실패해도 출결 동기화는 된 것이라 다음 동기화 때 다시 올린다
       if (isGithub(cfg))
-        pushPending(cfg, widgetSummary(merged, indexHolidays(merged.holidays)))
+        pushPending(cfg, widgetSummary(merged, indexHolidays(merged.holidays), today()))
           .then(() => setWidgetSync({ kind: 'ok', at: new Date().toISOString() }))
           .catch((e) => setWidgetSync({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
     } catch (e) {

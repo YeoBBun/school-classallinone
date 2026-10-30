@@ -33,7 +33,7 @@ const DRIVE_FILE = 'class-state.json';
 
 const CONFIG_KEY = 'neis-sync-config';
 const STATE_PATH = 'sync/state.json';
-/** 휴대폰 위젯이 읽는 받을 서류 요약 (같은 비밀번호로 잠근다) */
+/** 휴대폰 위젯이 읽는 처리 예정 요약 (같은 비밀번호로 잠근다) */
 const PENDING_PATH = 'sync/pending.json';
 /** 이 기기가 마지막으로 올린 요약 — 그대로면 다시 올리지 않는다 */
 const PENDING_SENT_KEY = 'widget-pending-sent';
@@ -268,7 +268,7 @@ export async function syncNow(cfg: SyncConfig, local: AppState): Promise<AppStat
 }
 
 /**
- * 휴대폰 위젯용 받을 서류 요약을 올린다. 이 기기가 지난번에 올린 것과 같으면 건너뛴다.
+ * 휴대폰 위젯용 처리 예정 요약을 올린다. 이 기기가 지난번에 올린 것과 같으면 건너뛴다.
  * 다른 기기가 같은 내용을 먼저 올렸어도 덮어쓸 뿐이라 해가 없다.
  */
 export async function pushPending(cfg: GithubSyncConfig, summary: unknown): Promise<void> {
