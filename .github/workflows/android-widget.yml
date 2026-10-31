@@ -1,7 +1,7 @@
-name: Android widget
+name: Android app
 
-# 휴대폰 '처리 예정' 위젯 앱(android-widget/)을 빌드한다.
-# 기본 브랜치에 올라가거나 직접 실행하면 Releases 의 'widget-latest' 에 APK 를 올린다.
+# 휴대폰 '학급관리' 앱 + 처리 예정 위젯(android-widget/)을 빌드한다.
+# 기본 브랜치에 올라가거나 직접 실행하면 Releases 의 'app-latest' 에 APK 를 올린다.
 on:
   push:
     paths:
@@ -42,27 +42,27 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon testDebugUnitTest assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk attendance-widget.apk
+          cp app/build/outputs/apk/release/app-release.apk class-app.apk
 
       - name: 어떤 키로 서명했나
         run: |
           if [ -f release.keystore ]; then echo "서명: 고정 키 (덮어 설치 가능)"; else echo "::warning::서명: 디버그 키 — Secrets 에 WIDGET_KEYSTORE_B64·WIDGET_KEYSTORE_PASSWORD 가 없어 다음 버전은 지우고 다시 깔아야 해요"; fi
-          "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs attendance-widget.apk | grep -i sha-256
+          "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs class-app.apk | grep -iE "sha-1|sha-256"  # SHA-1 은 구글 클라우드 콘솔의 안드로이드 클라이언트에 넣는다
 
       - uses: actions/upload-artifact@v4
         with:
-          name: attendance-widget
-          path: android-widget/attendance-widget.apk
+          name: class-app
+          path: android-widget/class-app.apk
 
       - name: Releases 에 올리기
         if: github.ref_name == github.event.repository.default_branch || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view widget-latest >/dev/null 2>&1; then
-            gh release upload widget-latest attendance-widget.apk --clobber
+          if gh release view app-latest >/dev/null 2>&1; then
+            gh release upload app-latest class-app.apk --clobber
           else
-            gh release create widget-latest attendance-widget.apk --prerelease \
-              --title "처리 예정 위젯 (안드로이드)" \
-              --notes "휴대폰에서 attendance-widget.apk 를 받아 설치하세요. 설치 방법은 android-widget/README.md 참고."
+            gh release create app-latest class-app.apk --prerelease \
+              --title "학급관리 앱 (안드로이드)" \
+              --notes "휴대폰에서 class-app.apk 를 받아 설치하세요. 설치 방법은 android-widget/README.md 참고."
           fi

@@ -6,6 +6,6 @@
     <color name="divider">#FFEEF0F3</color>
     <color name="accent">#FF2563EB</color>
     <color name="overdue">#FFDC2626</color>
-    <color name="icon_bg">#FF0F766E</color>
+    <color name="icon_bg">#FF2563EB</color>
     <color name="app_bg">#FFF4F5F7</color>
 </resources>

@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -15,13 +15,16 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.google.android.gms.auth.api.identity.AuthorizationResult
+import com.google.android.gms.auth.api.identity.Identity
 import org.json.JSONObject
 import java.io.File
 
 /**
- * 출결 앱(웹)을 이 앱 화면 안에서 연다 — 브라우저 없이 앱으로.
- * 데이터는 이 앱 안(WebView 저장 공간)에 따로 저장되므로, 처음 한 번 출결 앱 설정에서 동기화를 연결한다.
- * 파일 저장·공유·선택은 WebView 가 그냥은 못 해서 여기서 맡는다 (출결 앱 src/platform/android.ts 와 짝).
+ * 학급관리 앱(웹)을 이 앱 화면 안에서 연다 — 브라우저 없이 앱으로.
+ * 데이터는 이 앱 안(WebView 저장 공간)에 따로 저장되므로, 처음 한 번 구글 로그인으로 다른 기기와 맞춘다.
+ * 파일 저장·공유·선택, 구글 로그인은 WebView 가 그냥은 못 해서 여기서 맡는다
+ * (학급관리 src/platform/android.ts, src/google/google.ts 와 짝).
  */
 class WebAppActivity : Activity() {
     private lateinit var web: WebView
@@ -38,9 +41,9 @@ class WebAppActivity : Activity() {
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.addJavascriptInterface(Bridge(), "AttendanceApp")
+        web.addJavascriptInterface(Bridge(), "ClassApp")
         web.webViewClient = object : WebViewClient() {
-            // 출결 앱 밖의 링크(깃허브 등)는 브라우저로
+            // 학급관리 밖의 링크(구글 드라이브 자료 등)는 브라우저·해당 앱으로
             override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                 val u = req.url
                 if (u.host == home.host && (u.path ?: "").startsWith(home.path ?: "/")) return false
@@ -77,7 +80,7 @@ class WebAppActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        // 서류를 '받음' 으로 바꿨으면 출결 앱이 요약을 올린 뒤(고친 뒤 4초 + 올리기) 위젯도 새로 받는다
+        // 서류를 '받음' 으로 바꿨으면 학급관리가 요약을 올린 뒤(고친 뒤 4초 + 올리기) 위젯도 새로 받는다
         Refresh.later(this, 20)
     }
 
@@ -105,13 +108,81 @@ class WebAppActivity : Activity() {
                     toast("저장하지 못했어요: ${e.message}")
                 }
             }
+            REQ_GOOGLE -> {
+                if (resultCode != RESULT_OK) return sendGoogle(JSONObject().put("error", "로그인 창이 닫혔어요."))
+                try {
+                    val intent = data ?: return sendGoogle(JSONObject().put("error", "로그인 창이 닫혔어요."))
+                    onAuthorized(Identity.getAuthorizationClient(this).getAuthorizationResultFromIntent(intent))
+                } catch (e: Exception) {
+                    sendGoogle(JSONObject().put("error", "구글 로그인에 실패했어요: ${e.message}"))
+                }
+            }
+        }
+    }
+
+    /**
+     * 구글 권한 받기. interactive 면 계정 고르기·허락 창을 띄우고, 아니면 창 없이 (이미 허락했을 때만).
+     * 결과는 웹의 window.classAppGoogle 로 넘긴다.
+     */
+    private fun authorize(interactive: Boolean) {
+        val email = Prefs(this).googleEmail.ifBlank { null }
+        Identity.getAuthorizationClient(this).authorize(GoogleAuth.request(if (interactive) null else email))
+            .addOnSuccessListener { r ->
+                if (!r.hasResolution()) return@addOnSuccessListener onAuthorized(r)
+                if (!interactive) return@addOnSuccessListener sendGoogle(JSONObject().put("error", "needs_signin"))
+                try {
+                    @Suppress("DEPRECATION")
+                    startIntentSenderForResult(r.pendingIntent!!.intentSender, REQ_GOOGLE, null, 0, 0, 0)
+                } catch (e: Exception) {
+                    sendGoogle(JSONObject().put("error", "구글 로그인 창을 열지 못했어요: ${e.message}"))
+                }
+            }
+            .addOnFailureListener { e ->
+                sendGoogle(JSONObject().put("error", if (interactive) "구글 로그인에 실패했어요: ${e.message}" else "needs_signin"))
+            }
+    }
+
+    private fun onAuthorized(r: AuthorizationResult) {
+        val token = r.accessToken ?: return sendGoogle(JSONObject().put("error", "구글 토큰을 받지 못했어요."))
+        sendGoogle(
+            JSONObject()
+                .put("access_token", token)
+                .put("scope", r.grantedScopes.joinToString(" "))
+                // 구글 토큰은 한 시간쯤 간다 — 조금 일찍 새로 받게
+                .put("expires_in", 3000),
+        )
+        // 위젯도 이제 받을 수 있다
+        if (Prefs(this).configured) Refresh.now(this)
+    }
+
+    private fun sendGoogle(result: JSONObject) {
+        runOnUiThread {
+            web.evaluateJavascript("window.classAppGoogle && window.classAppGoogle(${JSONObject.quote(result.toString())})", null)
         }
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
 
-    /** 출결 앱(웹)이 부르는 것. 자바스크립트 쪽 스레드에서 불리므로 화면 일은 runOnUiThread 로. */
+    /** 학급관리(웹)가 부르는 것. 자바스크립트 쪽 스레드에서 불리므로 화면 일은 runOnUiThread 로. */
     private inner class Bridge {
+        /** 계정 고르기·허락 창을 띄워 구글 로그인 */
+        @JavascriptInterface
+        fun googleSignIn() = runOnUiThread { authorize(interactive = true) }
+
+        /** 창 없이 새 토큰 (토큰이 끝났을 때 웹이 부른다) */
+        @JavascriptInterface
+        fun googleToken() = runOnUiThread { authorize(interactive = false) }
+
+        /** 연결 끊기: 위젯도 멈춘다 */
+        @JavascriptInterface
+        fun googleSignOut() {
+            val p = Prefs(this@WebAppActivity)
+            p.googleEmail = ""
+            p.passphrase = ""
+            p.clearCache()
+            PendingWidget.updateAll(this@WebAppActivity)
+        }
+
         @JavascriptInterface
         fun saveFile(name: String, mime: String, base64: String) {
             val bytes = Base64.decode(base64, Base64.DEFAULT)
@@ -144,16 +215,17 @@ class WebAppActivity : Activity() {
             runOnUiThread { startActivity(Intent.createChooser(send, "나이스 입력 파일 보내기")) }
         }
 
-        /** 출결 앱의 동기화 설정을 위젯도 쓴다. 바뀌었을 때만 받아 둔 것을 버리고 새로 받는다. */
+        /**
+         * 학급관리의 동기화 설정을 위젯도 쓴다: 구글로 맞출 때의 잠금 비밀번호와 계정.
+         * 바뀌었을 때만 받아 둔 것을 버리고 새로 받는다. (깃허브로 맞추면 위젯은 쓰지 않는다)
+         */
         @JavascriptInterface
         fun setSyncConfig(json: String) {
             val p = Prefs(this@WebAppActivity)
-            val (repo, token, pass) = if (json.isEmpty()) Triple("", "", "") else JSONObject(json).let {
-                Triple(it.optString("repo"), it.optString("token"), it.optString("passphrase"))
-            }
-            if (repo == p.repo && token == p.token && pass == p.passphrase) return
-            p.repo = repo
-            p.token = token
+            val o = if (json.isEmpty()) JSONObject() else JSONObject(json)
+            val pass = if (o.optString("kind") == "google") o.optString("passphrase") else ""
+            o.optString("email").takeIf { it.isNotBlank() }?.let { p.googleEmail = it }
+            if (pass == p.passphrase) return
             p.passphrase = pass
             p.clearCache()
             if (p.configured) Refresh.now(this@WebAppActivity)
@@ -164,5 +236,6 @@ class WebAppActivity : Activity() {
     companion object {
         private const val REQ_PICK = 1
         private const val REQ_SAVE = 2
+        private const val REQ_GOOGLE = 3
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { hasCalendarScope, signIn } from '../google/google';
+import { hasCalendarScope, isNativeGoogle, signIn } from '../google/google';
 import { CALENDAR_NAME } from '../google/calendarSync';
 import { useGoogle } from '../google/useGoogle';
 import { useStore } from '../store';
@@ -149,7 +149,7 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
               <li>자료 → 구글 드라이브 '학급관리/자료'</li>
               <li>{driveOn() ? '다른 기기와 맞추기 켜짐' : '다른 기기와 맞추기는 꺼져 있어요 (설정 → 구글 연결에서 켜요)'}</li>
             </ul>
-            <p className="hint">로그인은 한 시간쯤 지나면 끝나요. 그때 위에 뜨는 [구글 다시 연결]을 한 번 누르면 돼요.</p>
+            {!isNativeGoogle() && <p className="hint">로그인은 한 시간쯤 지나면 끝나요. 그때 위에 뜨는 [구글 다시 연결]을 한 번 누르면 돼요.</p>}
             <footer className="form-actions">
               <span className="spacer" />
               <button type="button" className="primary" onClick={onClose}>

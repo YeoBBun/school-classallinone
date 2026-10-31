@@ -3,6 +3,7 @@
  *
  * 권한은 좁게: drive.file (이 앱이 만든 파일·폴더만), calendar.app.created (이 앱이 만든 캘린더와 그 일정만).
  * 서버 없이 브라우저에서 바로 부르므로 로그인은 1시간쯤 뒤 끝나고, 그때는 [다시 연결]을 눌러야 한다.
+ * 휴대폰 '학급관리' 앱 안에서는 구글이 웹 화면 로그인을 막아서 휴대폰의 구글 로그인을 쓴다 — 끝나면 앱이 조용히 새로 받아 준다.
  */
 import { GOOGLE_CLIENT_ID } from './config';
 
@@ -61,16 +62,63 @@ function saveToken() {
   changed();
 }
 
-// 남은 토큰부터 읽어 둔다 (스크립트를 못 받아도 드라이브는 쓸 수 있게)
+// ─── 휴대폰 '학급관리' 앱 안 (android-widget/ 의 WebAppActivity 와 짝) ───
+
+interface NativeGoogle {
+  /** 계정 고르기·권한 창을 띄워 로그인 */
+  googleSignIn(): void;
+  /** 창 없이 새 토큰 (이미 허락했으면) */
+  googleToken(): void;
+  googleSignOut(): void;
+}
+
+function nativeGoogle(): NativeGoogle | undefined {
+  const app = (globalThis as unknown as { ClassApp?: Partial<NativeGoogle> }).ClassApp;
+  return typeof app?.googleToken === 'function' ? (app as NativeGoogle) : undefined;
+}
+
+/** 휴대폰 앱 안이라 로그인이 끝나도 [다시 연결] 없이 이어지는가 */
+export const isNativeGoogle = () => !!nativeGoogle();
+
+let nativeWaiters: { resolve: () => void; reject: (e: Error) => void }[] = [];
+
+// 앱이 결과를 넣어 준다: {access_token, scope, expires_in} 또는 {error}
+(globalThis as unknown as { classAppGoogle?: (json: string) => void }).classAppGoogle = (json) => {
+  const r = JSON.parse(json) as { access_token?: string; scope?: string; expires_in?: number; error?: string };
+  const waiting = nativeWaiters;
+  nativeWaiters = [];
+  if (!r.access_token) return waiting.forEach((w) => w.reject(r.error === 'needs_signin' ? new AuthError('구글 로그인이 필요해요.') : new Error(r.error || '구글 로그인에 실패했어요.')));
+  token = { access_token: r.access_token, expires_at: Date.now() + (r.expires_in ?? 3000) * 1000, scope: r.scope ?? '', email: token?.email };
+  saveToken();
+  waiting.forEach((w) => w.resolve());
+};
+
+/** 앱에 로그인·토큰을 부탁하고 기다린다. 이미 부탁해 둔 것이 있으면 같이 기다린다 */
+function nativeRequest(kind: 'signIn' | 'token'): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const first = nativeWaiters.length === 0;
+    nativeWaiters.push({ resolve, reject });
+    if (first || kind === 'signIn') {
+      const n = nativeGoogle()!;
+      if (kind === 'signIn') n.googleSignIn();
+      else n.googleToken();
+    }
+  });
+}
+
+// 남은 토큰부터 읽어 둔다 (스크립트를 못 받아도 드라이브는 쓸 수 있게). 앱 안에서는 끝난 토큰도 권한·이메일 표시용으로 둔다
 try {
   const t = JSON.parse(localStorage.getItem(TOKEN_KEY) ?? 'null') as Token | null;
-  if (t && t.expires_at > Date.now() + 60_000) token = t;
+  if (t && (t.expires_at > Date.now() + 60_000 || nativeGoogle())) token = t;
 } catch {
   /* 무시 */
 }
 
-export const hasToken = () => !!token && token.expires_at > Date.now() + 30_000;
-export const hasCalendarScope = () => hasToken() && token!.scope.includes(SCOPE_CAL);
+/** 지금 바로 쓸 수 있는 토큰이 있는가 */
+const fresh = () => !!token && token.expires_at > Date.now() + 30_000;
+/** 연결되어 있는가. 앱 안에서는 한 번 로그인했으면 계속 (토큰은 필요할 때 앱이 새로 준다) */
+export const hasToken = () => fresh() || (!!nativeGoogle() && !!token);
+export const hasCalendarScope = () => hasToken() && !!token?.scope.includes(SCOPE_CAL);
 export const googleEmail = () => token?.email ?? '';
 
 /** 한 번이라도 연결한 적 있는가 (끝난 연결 포함) — «다시 연결» 안내에 쓴다 */
@@ -128,6 +176,10 @@ export function preloadGoogle(): void {
 
 /** 반드시 버튼 클릭 안에서 부른다 (팝업 차단) */
 export async function signIn(): Promise<void> {
+  if (nativeGoogle()) {
+    await nativeRequest('signIn');
+    return afterSignIn();
+  }
   await loadScript();
   const g = gsi()!;
   await new Promise<void>((resolve, reject) => {
@@ -157,6 +209,10 @@ export async function signIn(): Promise<void> {
     });
     client.requestAccessToken();
   });
+  return afterSignIn();
+}
+
+async function afterSignIn(): Promise<void> {
   try {
     const r = await api('https://www.googleapis.com/oauth2/v3/userinfo');
     token!.email = ((await r.json()) as { email?: string }).email ?? '';
@@ -167,7 +223,8 @@ export async function signIn(): Promise<void> {
 }
 
 export function signOut(): void {
-  if (token) {
+  nativeGoogle()?.googleSignOut();
+  if (token && !nativeGoogle()) {
     try {
       gsi()?.accounts.oauth2.revoke(token.access_token, () => {});
     } catch {
@@ -184,9 +241,16 @@ export function signOut(): void {
   saveToken();
 }
 
-async function api(url: string, init: RequestInit = {}): Promise<Response> {
-  if (!hasToken()) throw new AuthError();
+async function api(url: string, init: RequestInit = {}, retried = false): Promise<Response> {
+  if (!fresh()) {
+    if (!nativeGoogle() || !token) throw new AuthError();
+    await nativeRequest('token');
+  }
   const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token!.access_token}`, ...(init.headers ?? {}) }, cache: 'no-store' });
+  if (res.status === 401 && nativeGoogle() && !retried) {
+    token = { ...token!, expires_at: 0 };
+    return api(url, init, true);
+  }
   if (res.status === 401) {
     token = { ...token!, expires_at: 0 };
     saveToken();

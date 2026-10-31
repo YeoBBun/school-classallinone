@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -7,14 +7,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.util.Base64
 
-/** pending-fixture.json 은 출결 앱의 encrypt() 로 '시험용 비밀번호' 를 써서 잠근 것이다. */
+/** pending-fixture.json 은 학급관리 앱의 encrypt() 로 '시험용 비밀번호' 를 써서 잠근 것이다. */
 class PendingTest {
     private val fixture = javaClass.getResource("/pending-fixture.json")!!.readText()
 
     @Test
-    fun `출결 앱이 잠근 요약을 푼다`() {
+    fun `학급관리 앱이 잠근 요약을 푼다`() {
         val s = Pending.parse(Pending.decrypt(fixture, "시험용 비밀번호"))
         assertEquals("2-3", s.className)
         assertEquals(listOf("결석계", "체험학습 보고서", "체험학습 신청서"), s.items.map { it.doc })
@@ -26,7 +25,7 @@ class PendingTest {
     @Test
     fun `비밀번호가 다르면 알려준다`() {
         val e = assertThrows(WidgetError::class.java) { Pending.decrypt(fixture, "틀림") }
-        assertEquals("잠금 비밀번호가 출결 앱과 달라요.", e.message)
+        assertEquals("잠금 비밀번호가 학급관리 앱과 달라요.", e.message)
     }
 
     @Test
@@ -69,18 +68,19 @@ class PendingTest {
     }
 
     @Test
-    fun `깃허브에서 받고, sha 가 같으면 건너뛴다`() {
-        // 깃허브는 base64 를 60자마다 줄바꿈해서 준다
-        val b64 = Base64.getMimeEncoder(60, "\n".toByteArray()).encodeToString(fixture.toByteArray())
-        val body = """{"sha":"abc","content":"${b64.replace("\n", "\\n")}"}""".toByteArray()
+    fun `드라이브에서 받고, version 이 같으면 건너뛴다`() {
+        val list = """{"files":[{"id":"f1","version":"7"}]}""".toByteArray()
+        val content = fixture.toByteArray()
         val requests = mutableListOf<List<String>>()
         // 안드로이드 단위 시험에는 com.sun.net.httpserver 가 없어 소켓으로 직접 답한다
         val server = ServerSocket(0, 0, InetAddress.getLoopbackAddress())
         val thread = Thread {
-            repeat(2) {
+            repeat(3) {
                 server.accept().use { sock ->
                     val reader = sock.getInputStream().bufferedReader()
-                    requests += generateSequence { reader.readLine()?.takeIf { it.isNotEmpty() } }.toList()
+                    val head = generateSequence { reader.readLine()?.takeIf { it.isNotEmpty() } }.toList()
+                    requests += head
+                    val body = if (head[0].contains("alt=media")) content else list
                     val out = sock.getOutputStream()
                     out.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
                     out.write(body)
@@ -89,13 +89,14 @@ class PendingTest {
             }
         }.apply { start() }
         try {
-            GitHub.api = "http://127.0.0.1:${server.localPort}"
-            val f = GitHub.fetchPending("me/sync", "tok", null)!!
-            assertEquals("GET /repos/me/sync/contents/sync/pending.json HTTP/1.1", requests[0][0])
+            Drive.api = "http://127.0.0.1:${server.localPort}"
+            val f = Drive.fetchPending("tok", null)!!
+            assertTrue(requests[0][0].contains("class-pending.json"))
             assertTrue(requests[0].contains("Authorization: Bearer tok"))
-            assertEquals("abc", f.sha)
+            assertTrue(requests[1][0].startsWith("GET /files/f1?alt=media"))
+            assertEquals("7", f.version)
             assertEquals(fixture, f.text)
-            assertNull(GitHub.fetchPending("me/sync", "tok", "abc"))
+            assertNull(Drive.fetchPending("tok", "7"))
         } finally {
             thread.join(5_000)
             server.close()
@@ -103,35 +104,23 @@ class PendingTest {
     }
 
     @Test
-    fun `저장소 주소를 붙여 넣어도 이름만 남긴다`() {
-        assertEquals("me/sync", GitHub.normalizeRepo(" https://github.com/me/sync.git/ "))
-        assertEquals("me/sync", GitHub.normalizeRepo("me/sync"))
-    }
-
-    @Test
-    fun `요약이 없을 때와 저장소가 안 보일 때를 나눠 알린다`() {
-        fun serve(repoStatus: Int): String {
-            val server = ServerSocket(0, 0, InetAddress.getLoopbackAddress())
-            val thread = Thread {
-                repeat(2) {
-                    server.accept().use { sock ->
-                        val first = sock.getInputStream().bufferedReader().let { r ->
-                            generateSequence { r.readLine()?.takeIf { it.isNotEmpty() } }.toList()[0]
-                        }
-                        val status = if (first.startsWith("GET /repos/me/sync HTTP")) repoStatus else 404
-                        sock.getOutputStream().write("HTTP/1.1 $status X\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".toByteArray())
-                    }
-                }
-            }.apply { start() }
-            try {
-                GitHub.api = "http://127.0.0.1:${server.localPort}"
-                return assertThrows(WidgetError::class.java) { GitHub.fetchPending("me/sync", "tok", null) }.message!!
-            } finally {
-                thread.join(5_000)
-                server.close()
+    fun `드라이브에 요약이 없으면 알려준다`() {
+        val server = ServerSocket(0, 0, InetAddress.getLoopbackAddress())
+        val thread = Thread {
+            server.accept().use { sock ->
+                val reader = sock.getInputStream().bufferedReader()
+                generateSequence { reader.readLine()?.takeIf { it.isNotEmpty() } }.toList()
+                val body = """{"files":[]}""".toByteArray()
+                sock.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray() + body)
             }
+        }.apply { start() }
+        try {
+            Drive.api = "http://127.0.0.1:${server.localPort}"
+            val e = assertThrows(WidgetError::class.java) { Drive.fetchPending("tok", null) }
+            assertTrue(e.message!!.startsWith("아직 처리 예정 요약이 없어요"))
+        } finally {
+            thread.join(5_000)
+            server.close()
         }
-        assertTrue(serve(200).startsWith("아직 처리 예정 요약이 없어요"))
-        assertTrue(serve(404).startsWith("저장소를 찾지 못했어요"))
     }
 }

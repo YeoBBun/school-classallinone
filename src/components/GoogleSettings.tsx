@@ -10,7 +10,7 @@ import { SyncLine } from './SyncSettings';
 /** 구글 연결: 로그인 하나로 캘린더(일정)·드라이브(자료, 기기 간 맞추기)·시트를 쓴다. 처음 로그인은 LoginDialog 가 맡는다 */
 export function GoogleSettings() {
   const g = useGoogle();
-  const { state, update, sync, syncNow, calendar } = useStore();
+  const { state, update, sync, syncNow, calendar, widgetSync } = useStore();
   const cfg = loadSyncConfig();
   const driveOn = !!cfg && !isGithub(cfg);
   const [dialog, setDialog] = useState(false);
@@ -82,6 +82,7 @@ export function GoogleSettings() {
             {driveOn ? (
               <>
                 <SyncLine status={sync} onRetry={syncNow} />
+                {widgetSync.kind === 'error' && <p className="error">휴대폰 위젯용 요약을 못 올렸어요: {widgetSync.message}</p>}
                 <button className="ghost small" onClick={driveStop}>
                   끄기
                 </button>

@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">학급관리</string>
     <string name="widget_name">처리 예정</string>
-    <string name="widget_description">학급관리 앱의 출결 서류·일정·제출물·할 일</string>
+    <string name="widget_description">학급관리의 출결 서류·일정·제출물·할 일</string>
     <string name="settings_title">처리 예정 위젯 설정</string>
     <string name="app_url_label">학급관리 앱 주소 (바꿀 일이 거의 없어요)</string>
     <string name="save">지금 불러오기</string>

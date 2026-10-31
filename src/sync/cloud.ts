@@ -205,6 +205,33 @@ function driveError(e: unknown): never {
 }
 
 const WRONG_PASS = '잠금 비밀번호가 다른 기기와 달라요.';
+/** 휴대폰 위젯이 읽는 처리 예정 요약 (같은 잠금 비밀번호로 잠근다). 위젯 앱 Drive.kt 와 짝 */
+const DRIVE_PENDING = 'class-pending.json';
+
+/**
+ * 휴대폰 위젯용 처리 예정 요약을 드라이브 '학급관리' 폴더에 올린다. 이 기기가 지난번에 올린 것과 같으면 건너뛴다.
+ * (다른 기기가 먼저 올렸어도 덮어쓸 뿐이라 해가 없다)
+ */
+export async function pushPendingDrive(cfg: GoogleSyncConfig, summary: unknown): Promise<void> {
+  const sent = `drive\n${JSON.stringify(summary)}`;
+  try {
+    if (localStorage.getItem(PENDING_SENT_KEY) === sent) return;
+  } catch {
+    /* 저장 공간을 못 쓰면 매번 올린다 */
+  }
+  try {
+    const folder = await google.rootFolder();
+    const file = await google.findFile(DRIVE_PENDING, folder);
+    await google.writeJson({ fileId: file?.id, name: DRIVE_PENDING, parentId: folder, data: await encrypt(summary, cfg.passphrase) });
+  } catch (e) {
+    driveError(e);
+  }
+  try {
+    localStorage.setItem(PENDING_SENT_KEY, sent);
+  } catch {
+    /* 다음에 다시 올린다 */
+  }
+}
 
 /** 드라이브에 다른 기기가 올린 기록이 있는가 — 처음 로그인할 때 잠금 비밀번호를 새로 정할지 물을지 고른다 */
 export async function driveHasState(): Promise<boolean> {

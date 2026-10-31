@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "attendance-widget"
+rootProject.name = "class-app"
 include(":app")

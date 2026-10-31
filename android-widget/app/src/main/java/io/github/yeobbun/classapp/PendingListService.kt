@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import android.content.Context
 import android.content.Intent

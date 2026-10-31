@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import android.app.Activity
 import android.os.Bundle
@@ -7,7 +7,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 
-/** 위젯 설정: 연결 정보는 출결 앱의 동기화 설정을 따르고, 여기서는 상태 확인과 출결 앱 주소만 */
+/** 위젯 설정: 연결 정보는 학급관리 앱의 구글 로그인을 따르고, 여기서는 상태 확인과 학급관리 앱 주소만 */
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,8 +37,8 @@ class MainActivity : Activity() {
     }
 
     private fun describe(p: Prefs): String {
-        if (!p.configured) return "학급관리 앱에서 설정 → 휴대폰 ↔ PC 동기화를 연결하면 위젯도 같은 설정으로 처리 예정을 받아 와요."
-        val head = "동기화 저장소: ${p.repo}"
+        if (!p.configured) return "학급관리 앱을 열어 구글로 로그인하고 잠금 비밀번호를 정하면, 위젯도 같은 계정으로 처리 예정을 받아 와요."
+        val head = "구글 계정: ${p.googleEmail.ifBlank { "(학급관리 앱에서 로그인한 계정)" }}"
         p.error?.let { return "$head\n\n⚠ $it" }
         val s = p.summary() ?: return head
         val at = if (p.checkedAt > 0) DateFormat.format("M/d H:mm", p.checkedAt).toString() + " 확인 · " else ""

@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import android.content.Context
 import androidx.work.Constraints
@@ -20,18 +20,20 @@ object Refresh {
     private const val NOW = "pending-now"
 
     /**
-     * 깃허브에서 받아 저장한다. 실패해도 전에 받은 목록은 그대로 두고 오류만 남긴다.
-     * 돌려주는 값: 오류 문장 (성공이면 null)
+     * 구글 드라이브에서 받아 저장한다. 실패해도 전에 받은 목록은 그대로 두고 오류만 남긴다.
+     * 돌려주는 값: 오류 문장 (성공이면 null). 메인 스레드에서 부르면 안 된다.
      */
     fun run(ctx: Context): String? {
         val p = Prefs(ctx)
-        if (!p.configured) return "출결 앱에서 동기화를 연결해 주세요."
+        if (!p.configured) return "학급관리 앱에서 구글 로그인을 해 주세요."
         val err = try {
-            GitHub.fetchPending(p.repo.trim(), p.token.trim(), p.sha)?.let { file ->
+            val token = GoogleAuth.silentToken(ctx, p.googleEmail.ifBlank { null })
+                ?: throw WidgetError("구글 로그인이 필요해요. 학급관리 앱을 열어 주세요.")
+            Drive.fetchPending(token, p.sha)?.let { file ->
                 val plain = Pending.decrypt(file.text, p.passphrase)
                 Pending.parse(plain) // 형식 확인
                 p.summaryJson = plain
-                p.sha = file.sha
+                p.sha = file.version
             }
             p.checkedAt = System.currentTimeMillis()
             null
@@ -58,7 +60,7 @@ object Refresh {
         WorkManager.getInstance(ctx).enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<Worker>().build())
     }
 
-    /** 몇 초 뒤에 한 번 (출결 앱이 요약을 올릴 시간을 두고) */
+    /** 몇 초 뒤에 한 번 (학급관리 앱이 요약을 올릴 시간을 두고) */
     fun later(ctx: Context, seconds: Long) {
         val req = OneTimeWorkRequestBuilder<Worker>().setInitialDelay(seconds, TimeUnit.SECONDS).build()
         WorkManager.getInstance(ctx).enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, req)

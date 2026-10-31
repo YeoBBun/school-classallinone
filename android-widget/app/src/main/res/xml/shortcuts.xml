@@ -7,7 +7,7 @@
         android:shortcutShortLabel="@string/shortcut_settings">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetClass="io.github.yeobbun.attendancewidget.MainActivity"
-            android:targetPackage="io.github.yeobbun.attendancewidget" />
+            android:targetClass="io.github.yeobbun.classapp.MainActivity"
+            android:targetPackage="io.github.yeobbun.classapp" />
     </shortcut>
 </shortcuts>

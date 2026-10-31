@@ -1,4 +1,4 @@
-package io.github.yeobbun.attendancewidget
+package io.github.yeobbun.classapp
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -36,7 +36,7 @@ class PendingWidget : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_REFRESH = "io.github.yeobbun.attendancewidget.REFRESH"
+        const val ACTION_REFRESH = "io.github.yeobbun.classapp.REFRESH"
 
         fun updateAll(ctx: Context, checking: Boolean = false) {
             val mgr = AppWidgetManager.getInstance(ctx)
@@ -61,20 +61,20 @@ class PendingWidget : AppWidgetProvider() {
             val refresh = PendingIntent.getBroadcast(
                 ctx, 2, Intent(ctx, PendingWidget::class.java).setAction(ACTION_REFRESH), PendingIntent.FLAG_IMMUTABLE,
             )
-            // 목록 줄을 누르면 출결 앱 — 줄마다 붙이는 fillInIntent 와 합쳐지므로 MUTABLE (안드로이드 14부터는 이 앱 안 화면만 가리킬 수 있다)
+            // 목록 줄을 누르면 학급관리 앱 — 줄마다 붙이는 fillInIntent 와 합쳐지므로 MUTABLE (안드로이드 14부터는 이 앱 안 화면만 가리킬 수 있다)
             val itemTemplate = PendingIntent.getActivity(
                 ctx, 3, Intent(ctx, WebAppActivity::class.java), PendingIntent.FLAG_MUTABLE,
             )
 
             val status = when {
                 checking -> "확인 중…"
-                !p.configured -> "동기화 연결 필요"
+                !p.configured -> "구글 로그인 필요"
                 p.error != null -> "⚠ ${p.error}"
                 p.checkedAt > 0 -> DateFormat.format("H:mm", p.checkedAt).toString() + " 확인"
                 else -> ""
             }
             val empty = when {
-                !p.configured -> "눌러서 학급관리 앱 설정 → 동기화를 연결해 주세요"
+                !p.configured -> "눌러서 학급관리 앱을 열고 구글로 로그인해 주세요"
                 summary == null -> p.error ?: "불러오는 중…"
                 else -> "✓ 처리할 것이 없어요"
             }

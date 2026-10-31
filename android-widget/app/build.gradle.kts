@@ -9,13 +9,13 @@ val keystore = rootProject.file("release.keystore")
 val keystorePassword: String? = System.getenv("WIDGET_KEYSTORE_PASSWORD")
 
 android {
-    namespace = "io.github.yeobbun.attendancewidget"
+    namespace = "io.github.yeobbun.classapp"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.yeobbun.attendancewidget"
+        applicationId = "io.github.yeobbun.classapp"
         minSdk = 26
-        // 35 로 올리면 화면이 상태 표시줄 밑까지 깔려(edge-to-edge 강제) 출결 앱 머리글이 가려진다
+        // 35 로 올리면 화면이 상태 표시줄 밑까지 깔려(edge-to-edge 강제) 학급관리 머리글이 가려진다
         targetSdk = 34
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
@@ -51,6 +51,8 @@ android {
 dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
+    // 휴대폰의 구글 로그인 (드라이브·캘린더 권한)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
     testImplementation("junit:junit:4.13.2")
     // 안드로이드 단위 시험에서는 org.json 이 껍데기뿐이라 진짜를 넣는다
     testImplementation("org.json:json:20240303")
