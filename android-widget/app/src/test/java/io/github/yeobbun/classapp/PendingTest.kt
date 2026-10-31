@@ -46,7 +46,7 @@ class PendingTest {
     }
 
     @Test
-    fun `묶음별 요약: 남은 날, 지난 일정 감추기, 기한 지난 것 위로`() {
+    fun `묶음별 요약 - 남은 날, 지난 일정 감추기, 기한 지난 것 위로`() {
         val plain = """
             {"format":"attendance-app/pending-v1","className":"2-3","items":[],"sections":[
               {"title":"일정","rows":[
