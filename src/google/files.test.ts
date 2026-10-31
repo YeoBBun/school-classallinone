@@ -51,3 +51,30 @@ describe('자료 올리기', () => {
     expect((await g.listFiles('folder1')).map((f) => f.id)).toEqual(['f1', 'f2']);
   });
 });
+
+describe('폴더 찾기', () => {
+  const reset = () => ['class-google-folder', 'class-google-files-folder'].forEach((k) => localStorage.removeItem(k));
+
+  it('여러 곳에서 동시에 찾아도 폴더는 하나만 만든다', async () => {
+    reset();
+    let made = 0;
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') return new Response(JSON.stringify({ id: `new${++made}` }), { status: 200 });
+      return new Response(JSON.stringify({ files: [] }), { status: 200 });
+    });
+    const ids = await Promise.all([g.rootFolder(), g.rootFolder(), g.filesFolder(), g.filesFolder()]);
+    expect(made).toBe(2);
+    expect(ids).toEqual(['new1', 'new1', 'new2', 'new2']);
+  });
+
+  it('같은 이름 폴더가 여럿이면 안에 뭔가 든 쪽을 쓴다', async () => {
+    reset();
+    vi.stubGlobal('fetch', async (url: string) => {
+      const query = decodeURIComponent(url);
+      if (query.includes("name='학급관리'")) return new Response(JSON.stringify({ files: [{ id: 'empty' }, { id: 'full' }] }), { status: 200 });
+      if (query.includes("'full' in parents")) return new Response(JSON.stringify({ files: [{ id: 'state' }] }), { status: 200 });
+      return new Response(JSON.stringify({ files: [] }), { status: 200 });
+    });
+    expect(await g.rootFolder()).toBe('full');
+  });
+});

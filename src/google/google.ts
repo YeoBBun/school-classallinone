@@ -214,30 +214,84 @@ async function findOne(query: string): Promise<{ id: string; version: string } |
   return ((await r.json()) as { files: { id: string; version: string }[] }).files[0] ?? null;
 }
 
-/** 내 드라이브의 '학급관리' 폴더 (없으면 만든다) */
-export async function rootFolder(): Promise<string> {
+/** 이 기기에서 쓰던 폴더 id → 이번에 열고 나서 휴지통에 없는 것을 확인했는가 */
+const checked = new Set<string>();
+/** 지금 찾고 있는 폴더 (저장 키별) — 여러 곳에서 동시에 불러도 한 번만 찾고 만든다 */
+const pending = new Map<string, Promise<string>>();
+
+function readKey(key: string): string | null {
   try {
-    const cached = localStorage.getItem(FOLDER_KEY);
-    if (cached) return cached;
+    return localStorage.getItem(key);
   } catch {
-    /* 무시 */
+    return null;
   }
-  const found = await findOne(`name='${q(ROOT_FOLDER)}' and mimeType='${FOLDER_MIME}' and trashed=false`);
-  const id =
-    found?.id ??
-    ((await (
-      await api(`${DRIVE}/files?fields=id`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: ROOT_FOLDER, mimeType: FOLDER_MIME }),
-      })
-    ).json()) as { id: string }).id;
+}
+
+/** 아직 쓸 수 있는 폴더인가 (지워졌거나 휴지통이면 아니다). 한 번 확인하면 다시 묻지 않는다 */
+async function alive(id: string): Promise<boolean> {
+  if (checked.has(id)) return true;
   try {
-    localStorage.setItem(FOLDER_KEY, id);
+    const r = await api(`${DRIVE}/files/${id}?fields=trashed`);
+    if (((await r.json()) as { trashed?: boolean }).trashed) return false;
+  } catch (e) {
+    if (e instanceof GoogleError && e.status === 404) return false;
+    throw e;
+  }
+  checked.add(id);
+  return true;
+}
+
+async function hasChildren(id: string): Promise<boolean> {
+  const r = await api(`${DRIVE}/files?q=${encodeURIComponent(`'${q(id)}' in parents and trashed=false`)}&fields=files(id)&pageSize=1`);
+  return ((await r.json()) as { files: unknown[] }).files.length > 0;
+}
+
+async function findOrMakeFolder(key: string, name: string, parentId?: string): Promise<string> {
+  const cached = readKey(key);
+  if (cached && (await alive(cached))) return cached;
+  const where = `name='${q(name)}' and mimeType='${FOLDER_MIME}' and trashed=false${parentId ? ` and '${q(parentId)}' in parents` : ''}`;
+  const r = await api(`${DRIVE}/files?q=${encodeURIComponent(where)}&fields=files(id)&spaces=drive&pageSize=10&orderBy=createdTime`);
+  const found = ((await r.json()) as { files: { id: string }[] }).files;
+  let id = found[0]?.id;
+  // 같은 이름이 여럿이면 (예전에 두 곳에서 동시에 만든 경우) 안에 뭔가 든 쪽을 쓴다
+  if (found.length > 1) {
+    for (const f of found) {
+      if (await hasChildren(f.id)) {
+        id = f.id;
+        break;
+      }
+    }
+  }
+  if (!id) {
+    const made = await api(`${DRIVE}/files?fields=id`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: FOLDER_MIME, ...(parentId ? { parents: [parentId] } : {}) }),
+    });
+    id = ((await made.json()) as { id: string }).id;
+  }
+  checked.add(id);
+  try {
+    localStorage.setItem(key, id);
   } catch {
     /* 무시 */
   }
   return id;
+}
+
+/** 폴더 찾기 (없으면 만든다). 동시에 여러 번 불러도 같은 약속을 돌려준다 */
+function folder(key: string, name: string, parent?: () => Promise<string>): Promise<string> {
+  let p = pending.get(key);
+  if (!p) {
+    p = (async () => findOrMakeFolder(key, name, parent && (await parent())))().finally(() => pending.delete(key));
+    pending.set(key, p);
+  }
+  return p;
+}
+
+/** 내 드라이브의 '학급관리' 폴더 (없으면 만든다) */
+export function rootFolder(): Promise<string> {
+  return folder(FOLDER_KEY, ROOT_FOLDER);
 }
 
 export async function findFile(name: string, parentId: string) {
@@ -303,38 +357,8 @@ export interface DriveFile {
 }
 
 /** '학급관리/자료' 폴더 (없거나 휴지통에 있으면 새로 만든다) */
-export async function filesFolder(): Promise<string> {
-  let cached: string | null = null;
-  try {
-    cached = localStorage.getItem(FILES_FOLDER_KEY);
-  } catch {
-    /* 무시 */
-  }
-  if (cached) {
-    try {
-      const r = await api(`${DRIVE}/files/${cached}?fields=trashed`);
-      if (!((await r.json()) as { trashed?: boolean }).trashed) return cached;
-    } catch (e) {
-      if (!(e instanceof GoogleError && e.status === 404)) throw e;
-    }
-  }
-  const root = await rootFolder();
-  const found = await findOne(`name='${q(FILES_FOLDER)}' and mimeType='${FOLDER_MIME}' and '${q(root)}' in parents and trashed=false`);
-  const id =
-    found?.id ??
-    ((await (
-      await api(`${DRIVE}/files?fields=id`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: FILES_FOLDER, mimeType: FOLDER_MIME, parents: [root] }),
-      })
-    ).json()) as { id: string }).id;
-  try {
-    localStorage.setItem(FILES_FOLDER_KEY, id);
-  } catch {
-    /* 무시 */
-  }
-  return id;
+export function filesFolder(): Promise<string> {
+  return folder(FILES_FOLDER_KEY, FILES_FOLDER, rootFolder);
 }
 
 /** 폴더 안 파일 (최근에 고친 것부터). drive.file 권한이라 이 앱으로 올린 파일만 보인다 */
