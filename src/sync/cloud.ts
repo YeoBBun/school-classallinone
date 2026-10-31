@@ -31,18 +31,19 @@ export const isGithub = (cfg: SyncConfig): cfg is GithubSyncConfig => cfg.kind !
 
 const DRIVE_FILE = 'class-state.json';
 
-const CONFIG_KEY = 'neis-sync-config';
+// 출결관리 앱과 같은 주소 아래라 이름을 따로 쓴다 (출결관리의 동기화 설정을 덮어쓰거나 가져오지 않게)
+const CONFIG_KEY = 'class-sync-config';
 const STATE_PATH = 'sync/state.json';
 /** 휴대폰 위젯이 읽는 처리 예정 요약 (같은 비밀번호로 잠근다) */
 const PENDING_PATH = 'sync/pending.json';
 /** 이 기기가 마지막으로 올린 요약 — 그대로면 다시 올리지 않는다 */
-const PENDING_SENT_KEY = 'widget-pending-sent';
+const PENDING_SENT_KEY = 'class-widget-pending-sent';
 const ENC_FORMAT = 'attendance-app/state-enc-v1';
 const PBKDF2_ITER = 210_000;
 
 let API = (() => {
   try {
-    return localStorage.getItem('neis-sync-api') ?? 'https://api.github.com'; // 시험용으로만 바꾼다
+    return localStorage.getItem('class-sync-api') ?? 'https://api.github.com'; // 시험용으로만 바꾼다
   } catch {
     return 'https://api.github.com';
   }

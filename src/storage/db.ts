@@ -4,9 +4,45 @@ import { DEFAULT_SETTINGS, emptyState, type AppState, type Settings } from '../d
 import { androidApp, blobBase64 } from '../platform/android';
 
 // 모든 데이터는 이 브라우저의 IndexedDB 에만 저장한다. 외부 서버로 보내지 않는다.
-const DB_NAME = 'attendance-app';
+// 출결관리 앱(yeobbun.github.io/school-attendance)과 주소 앞부분이 같아 브라우저가 저장 공간을 같이 보여 주므로,
+// 학급관리는 이름을 따로 쓴다 — 예전 출결관리 앱이 저장하면서 학급관리 기록(관찰·상담 등)을 지우지 않게.
+const DB_NAME = 'class-app';
+/** 출결관리 앱의 저장소. 학급관리를 이 브라우저에서 처음 열 때 한 번 읽어 와 이어 쓴다 (고치거나 지우지 않는다) */
+const ATTENDANCE_DB = 'attendance-app';
 const STORE = 'kv';
 const KEY = 'state';
+
+/** 출결관리 앱이 이 브라우저에 남긴 기록. 그 저장소가 없으면 만들지 않고 null */
+function readAttendanceApp(): Promise<unknown> {
+  return new Promise((resolve) => {
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(ATTENDANCE_DB);
+    } catch {
+      return resolve(null);
+    }
+    // 처음 만드는 중이면 = 출결관리를 쓴 적 없음 → 만들지 않고 그만둔다
+    req.onupgradeneeded = () => req.transaction?.abort();
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.close();
+        return resolve(null);
+      }
+      const get = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+      get.onsuccess = () => {
+        db.close();
+        resolve(get.result ?? null);
+      };
+      get.onerror = () => {
+        db.close();
+        resolve(null);
+      };
+    };
+  });
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -25,7 +61,13 @@ export async function loadState(): Promise<AppState> {
     req.onerror = () => reject(req.error);
   });
   db.close();
-  return raw ? normalize(raw) : emptyState();
+  if (raw) return normalize(raw);
+  // 학급관리를 이 브라우저에서 처음 연다 → 출결관리에서 쓰던 기록이 있으면 이어서
+  const old = await readAttendanceApp().catch(() => null);
+  if (!old) return emptyState();
+  const state = normalize(old);
+  await saveState(state);
+  return state;
 }
 
 export async function saveState(state: AppState): Promise<void> {

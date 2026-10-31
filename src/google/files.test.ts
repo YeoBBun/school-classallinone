@@ -58,7 +58,7 @@ describe('폴더 찾기', () => {
   it('여러 곳에서 동시에 찾아도 폴더는 하나만 만든다', async () => {
     reset();
     let made = 0;
-    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
       if (init?.method === 'POST') return new Response(JSON.stringify({ id: `new${++made}` }), { status: 200 });
       return new Response(JSON.stringify({ files: [] }), { status: 200 });
     });
