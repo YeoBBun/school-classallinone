@@ -122,7 +122,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         commit((cur) => ({
           ...cur,
           calendarLinks: r.links,
-          settings: r.calendarId !== cur.settings.calendarId ? { ...cur.settings, calendarId: r.calendarId } : cur.settings,
+          settings:
+            r.calendarId !== cur.settings.calendarId || r.retired.join() !== (cur.settings.calendarRetired ?? []).join()
+              ? { ...cur.settings, calendarId: r.calendarId, calendarRetired: r.retired.length ? r.retired : undefined }
+              : cur.settings,
         }));
       }
       setCalendar({ kind: 'ok', at: new Date().toISOString() });

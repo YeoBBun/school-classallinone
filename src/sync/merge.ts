@@ -79,10 +79,27 @@ export function mergeStates(local: AppState, remote: AppState, now = new Date())
       .sort((a, b) => keyOf(field, a).localeCompare(keyOf(field, b)));
     (out as unknown as Record<string, unknown>)[field] = merged;
   }
-  const settings = newer(remote.settings, local.settings) ? local.settings : remote.settings;
+  const localWins = newer(remote.settings, local.settings);
+  const settings = localWins ? local.settings : remote.settings;
+  const other = localWins ? remote.settings : local.settings;
   // 백업 알림은 기기마다 따로 (이 기기에서 백업했는지가 중요하다)
-  out.settings = { ...settings, lastBackupAt: local.settings.lastBackupAt };
+  out.settings = { ...settings, lastBackupAt: local.settings.lastBackupAt, ...mergeCalendar(settings, other) };
   return dedupeStudents(out);
+}
+
+/**
+ * 구글 캘린더: 다른 설정을 고친 기기가 캘린더 id 를 지우지 않게, 어느 한쪽에라도 있으면 남긴다.
+ * 두 기기가 서로 다른 캘린더를 만들었으면 진 쪽을 지울 목록에 넣는다 (calendarSync 가 지운다).
+ */
+function mergeCalendar(win: AppState['settings'], lose: AppState['settings']): Partial<AppState['settings']> {
+  const calendarId = win.calendarId ?? lose.calendarId;
+  const retired = new Set([...(win.calendarRetired ?? []), ...(lose.calendarRetired ?? [])]);
+  if (lose.calendarId && lose.calendarId !== calendarId) retired.add(lose.calendarId);
+  if (calendarId) retired.delete(calendarId);
+  return {
+    ...(calendarId ? { calendarId } : {}),
+    ...(retired.size ? { calendarRetired: [...retired].sort() } : {}),
+  };
 }
 
 /**

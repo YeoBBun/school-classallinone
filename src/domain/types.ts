@@ -215,6 +215,8 @@ export interface CalendarLink extends Stamped {
   eventId: string;
   /** 일정 내용 요약 — 바뀌었을 때만 다시 올린다 */
   hash: string;
+  /** 넣은 캘린더 (예전 기록에는 없다 → 그때 쓰던 캘린더) */
+  cal?: string;
 }
 
 export interface SeatingRules {
@@ -256,6 +258,8 @@ export interface Settings extends Stamped {
   calendarOn?: boolean;
   /** 넣는 캘린더 */
   calendarId?: string;
+  /** 기기마다 따로 만들어져 지울 '학급관리' 캘린더 (기기 간 합친다) */
+  calendarRetired?: string[];
 }
 
 /** 구글 캘린더에 넣을 것인가 — 끄지 않았으면 넣는다 */
