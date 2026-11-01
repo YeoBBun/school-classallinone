@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 휴대폰을 어두운 화면으로 쓸 때의 위젯 색. 앱 화면(app_bg)은 학급관리 웹이 정하므로 그대로 -->
+<resources>
+    <color name="widget_bg">#FF1E2228</color>
+    <color name="text">#FFE8EAED</color>
+    <color name="muted">#FF9AA0A6</color>
+    <color name="divider">#FF2C3138</color>
+    <color name="accent">#FF7AA7FF</color>
+    <color name="overdue">#FFFF7070</color>
+    <color name="pill_bg">#FF2A2F37</color>
+    <color name="pill_today_bg">#FF1E3A6E</color>
+    <color name="pill_over_bg">#FF4A1F24</color>
+</resources>

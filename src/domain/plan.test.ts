@@ -37,6 +37,7 @@ describe('처리 예정', () => {
     expect(sections[2].rows.map((r) => r.type)).toEqual(['unwritten', 'followUp']);
 
     const w = widgetSummary(s, indexHolidays([]), '2026-10-30');
+    expect(w.sections.map((x) => x.link)).toEqual(['#schedule', '#checklists', '#today']);
     expect(w.sections[0].rows).toEqual([
       { title: '체육대회', text: '학급 행사', detail: '10/31(토)', on: '2026-10-31' },
       { title: '김하늘', text: '학부모 상담', detail: '11/2(월) 15:00', on: '2026-11-02' },

@@ -4,7 +4,7 @@
  */
 import { formatKo, type HolidayIndex } from './calendar';
 import { pendingDocs, shortTitle, studentName } from './pending';
-import { pilsaDetail, planSections, type PlanRow } from './plan';
+import { pilsaDetail, planSections, type PlanRow, type PlanSectionTitle } from './plan';
 import { DOC_FT_REPORT } from './rules';
 import type { AppState, DateStr, Note } from './types';
 
@@ -41,8 +41,19 @@ export interface WidgetSummary {
   format: typeof WIDGET_FORMAT;
   className: string;
   items: WidgetItem[];
-  sections: { title: string; rows: WidgetRow[] }[];
+  /** link: 위젯에서 그 묶음을 누르면 열 화면 */
+  sections: { title: string; link: string; rows: WidgetRow[] }[];
 }
+
+/** 위젯 묶음을 누르면 열 학급관리 화면. 받음·결과 적기·체크는 오늘 화면에서 한다 */
+const SECTION_LINK: Record<PlanSectionTitle, string> = {
+  '출결 서류': '#today',
+  일정: '#schedule',
+  제출물: '#checklists',
+  미처리: '#today',
+  필사: '#pilsa',
+  기타: '#today',
+};
 
 /**
  * 위젯에 보여줄 요약. 일정은 앞으로 14일 것이 담기고, 날짜에 따라 바뀌는 것(D-day, 기한 지남, 지난 일정)은
@@ -91,6 +102,6 @@ export function widgetSummary(state: AppState, holidays: HolidayIndex, today: Da
       ...(deadline ? { deadline } : {}),
       ...(doc.key === DOC_FT_REPORT ? { tripEnd: record.endDate } : {}),
     })),
-    sections: planSections(state, holidays, today).map((s) => ({ title: s.title, rows: s.rows.map(row) })),
+    sections: planSections(state, holidays, today).map((s) => ({ title: s.title, link: SECTION_LINK[s.title], rows: s.rows.map(row) })),
   };
 }

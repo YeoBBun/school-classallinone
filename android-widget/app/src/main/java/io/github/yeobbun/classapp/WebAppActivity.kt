@@ -70,8 +70,20 @@ class WebAppActivity : Activity() {
                 }
             }
         }
-        if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(home.toString())
+        if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(home.toString() + pageOf(intent))
     }
+
+    /** 앱이 이미 열려 있을 때 위젯 줄을 누르면 그 화면으로 */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val page = pageOf(intent)
+        if (page.isNotEmpty()) web.evaluateJavascript("location.hash = ${JSONObject.quote(page)}", null)
+    }
+
+    /** 위젯이 넘긴 화면 주소 (#schedule 같은 것만 받는다) */
+    private fun pageOf(intent: Intent?): String =
+        intent?.getStringExtra(EXTRA_PAGE)?.takeIf { PAGE.matches(it) } ?: ""
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
@@ -237,5 +249,8 @@ class WebAppActivity : Activity() {
         private const val REQ_PICK = 1
         private const val REQ_SAVE = 2
         private const val REQ_GOOGLE = 3
+        /** 위젯 줄을 눌렀을 때 열 학급관리 화면 (예: #checklists) */
+        const val EXTRA_PAGE = "page"
+        private val PAGE = Regex("^#[a-z]+(/[A-Za-z0-9_-]+)?$")
     }
 }

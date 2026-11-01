@@ -62,7 +62,8 @@ data class PlanRow(
     }
 }
 
-data class PlanSection(val title: String, val rows: List<PlanRow>)
+/** link: 누르면 열 학급관리 화면 (예: #checklists). 예전 요약에는 없다 */
+data class PlanSection(val title: String, val rows: List<PlanRow>, val link: String = "")
 
 data class PendingSummary(val className: String, val items: List<PendingItem>, val sections: List<PlanSection> = emptyList()) {
     /** 기한 지난 것을 위로 (나머지는 출결 날짜순 그대로) */
@@ -70,7 +71,7 @@ data class PendingSummary(val className: String, val items: List<PendingItem>, v
 
     /** 위젯에 보일 묶음: 지난 일정은 빼고, 묶음 안에서 기한 지난 것을 위로. 빈 묶음은 뺀다 */
     fun visible(today: String): List<PlanSection> =
-        sections.map { s -> PlanSection(s.title, s.rows.filterNot { it.hidden(today) }.sortedBy { if (it.overdue(today)) 0 else 1 }) }
+        sections.map { s -> s.copy(rows = s.rows.filterNot { it.hidden(today) }.sortedBy { if (it.overdue(today)) 0 else 1 }) }
             .filter { it.rows.isNotEmpty() }
 }
 
@@ -128,6 +129,7 @@ object Pending {
                             tripEnd = r.optString("tripEnd").ifEmpty { null },
                         )
                     },
+                    s.optString("link"),
                 )
             }
         } ?: listOf(PlanSection("출결 서류", items.map { PlanRow(it.who, it.doc, it.what, due = it.deadline, tripEnd = it.tripEnd) }))

@@ -6,6 +6,10 @@
     <color name="divider">#FFEEF0F3</color>
     <color name="accent">#FF2563EB</color>
     <color name="overdue">#FFDC2626</color>
+    <!-- D-day 알약 배경: 보통 / 오늘 / 지남 -->
+    <color name="pill_bg">#FFF2F4F6</color>
+    <color name="pill_today_bg">#FFE8F0FE</color>
+    <color name="pill_over_bg">#FFFFEEEE</color>
     <color name="icon_bg">#FF2563EB</color>
     <color name="app_bg">#FFF4F5F7</color>
 </resources>
