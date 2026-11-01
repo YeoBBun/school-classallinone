@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { indexHolidays, today, type HolidayIndex } from './domain/calendar';
 import { computeWarnings, type DocContext } from './domain/rules';
-import type { AppState } from './domain/types';
+import { calendarWanted, type AppState } from './domain/types';
 import { androidApp } from './platform/android';
 import { loadState, requestPersistence, saveState } from './storage/db';
 import { widgetSummary } from './domain/widget';
@@ -114,7 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const calBusy = useRef(false);
   const runCalendar = useCallback(async () => {
     const s = stateRef.current;
-    if (!s?.settings.calendarOn || calBusy.current) return;
+    if (!s || !calendarWanted(s.settings) || calBusy.current) return;
     calBusy.current = true;
     try {
       const r = await applyCalendar(s);

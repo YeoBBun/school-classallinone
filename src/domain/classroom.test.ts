@@ -3,7 +3,7 @@ import { desiredEvents, eventHash, planCalendar } from './calendarEvents';
 import { checklistProgress, missingText, neisBytes, newSchoolYear, pilsaSummary, submitPage, suggestedPages, todoSummary, undoPage } from './classroom';
 import { adjacent, partnerPairs, penalty, shuffleSeats, viewRows } from './seating';
 import { removeStudentData, remapStudents } from './student';
-import { emptyState, type AppState, type Checklist, type PilsaTask, type SeatingRules } from './types';
+import { calendarWanted, emptyState, type AppState, type Checklist, type PilsaTask, type SeatingRules } from './types';
 
 const students = [1, 2, 3, 4].map((n) => ({ id: `s${n}`, number: n, name: `학생${n}` }));
 const base = (): AppState => ({ ...emptyState(), holidays: [], students });
@@ -167,5 +167,13 @@ describe('학생 합치기·지우기', () => {
     expect([s.pilsa.length, s.behavior.length]).toEqual([0, 0]);
     expect(s.checklists[0].marks).toEqual({});
     expect(s.seatPlans[0].seats).toEqual([null, 's2']);
+  });
+});
+
+describe('구글 캘린더 설정', () => {
+  it('기본은 넣고, 설정에서 끈 사람만 안 넣는다', () => {
+    expect(calendarWanted(emptyState().settings)).toBe(true);
+    expect(calendarWanted({ ...emptyState().settings, calendarOn: true })).toBe(true);
+    expect(calendarWanted({ ...emptyState().settings, calendarOn: false })).toBe(false);
   });
 });

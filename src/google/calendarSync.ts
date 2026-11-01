@@ -3,7 +3,7 @@
  * 이미 넣은 일정은 calendarLinks 에 남겨 두고(기기 간 동기화됨), 바뀐 것만 고친다.
  */
 import { desiredEvents, eventHash, isEmptyPlan, planCalendar } from '../domain/calendarEvents';
-import type { AppState, CalendarLink } from '../domain/types';
+import { calendarWanted, type AppState, type CalendarLink } from '../domain/types';
 import * as google from './google';
 
 export const CALENDAR_NAME = '학급관리';
@@ -18,7 +18,7 @@ export interface CalendarResult {
 
 /** 할 일이 없으면 null. 일부만 성공해도 성공한 만큼은 돌려준다 (다음 번에 나머지를 한다) */
 export async function applyCalendar(s: AppState): Promise<CalendarResult | null> {
-  if (!s.settings.calendarOn || !google.hasCalendarScope()) return null;
+  if (!calendarWanted(s.settings) || !google.hasCalendarScope()) return null;
   let calendarId = s.settings.calendarId ?? '';
   let links = s.calendarLinks;
   if (!calendarId || (!checked.has(calendarId) && !(await google.calendarExists(calendarId)))) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { signIn, signOut } from '../google/google';
 import { CALENDAR_NAME } from '../google/calendarSync';
 import { useGoogle } from '../google/useGoogle';
+import { calendarWanted } from '../domain/types';
 import { useStore } from '../store';
 import { isGithub, loadSyncConfig, saveSyncConfig } from '../sync/cloud';
 import { LoginDialog } from './GoogleLogin';
@@ -44,7 +45,9 @@ export function GoogleSettings() {
     syncNow();
   };
 
-  const setCalendarOn = (on: boolean) => update((s) => ({ ...s, settings: { ...s.settings, calendarOn: on || undefined } }));
+  const calendarOn = calendarWanted(state.settings);
+  // 켜면 기본값(넣기)으로 되돌리고, 끌 때만 false 를 남긴다
+  const setCalendarOn = (on: boolean) => update((s) => ({ ...s, settings: { ...s.settings, calendarOn: on ? undefined : false } }));
 
   return (
     <section className="card">
@@ -100,12 +103,12 @@ export function GoogleSettings() {
           <div className="option">
             <h4>구글 캘린더</h4>
             <label className="check">
-              <input type="checkbox" checked={!!state.settings.calendarOn} onChange={(e) => setCalendarOn(e.target.checked)} />
+              <input type="checkbox" checked={calendarOn} onChange={(e) => setCalendarOn(e.target.checked)} />
               일정(상담·학급 행사)과 제출 마감을 캘린더 '{CALENDAR_NAME}'에 넣기
             </label>
-            {state.settings.calendarOn && !g.calendar && <p className="error">캘린더 권한이 없어요. 연결을 끊고 다시 로그인할 때 캘린더에 체크해 주세요.</p>}
-            {state.settings.calendarOn && calendar.kind === 'error' && <p className="error">캘린더에 넣지 못했어요: {calendar.message}</p>}
-            {state.settings.calendarOn && calendar.kind === 'ok' && (
+            {calendarOn && !g.calendar && <p className="error">캘린더 권한이 없어요. 연결을 끊고 다시 로그인할 때 캘린더에 체크해 주세요.</p>}
+            {calendarOn && calendar.kind === 'error' && <p className="error">캘린더에 넣지 못했어요: {calendar.message}</p>}
+            {calendarOn && calendar.kind === 'ok' && (
               <p className="sync-status done">✓ 일정 {state.calendarLinks.length}개가 캘린더에 들어가 있어요</p>
             )}
             <p className="hint">캘린더에는 학생 이름과 일시만 들어가고, 상담 내용은 들어가지 않아요.</p>

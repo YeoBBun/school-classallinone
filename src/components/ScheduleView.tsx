@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { addDays, formatKo, today } from '../domain/calendar';
-import { EVENT_KINDS, type ClassEvent, type EventKind, type Note } from '../domain/types';
+import { calendarWanted, EVENT_KINDS, type ClassEvent, type EventKind, type Note } from '../domain/types';
+import { useGoogle } from '../google/useGoogle';
 import { newId, useStore } from '../store';
 import { Modal, sortStudents } from './common';
 import { Icon } from './icons';
@@ -146,6 +147,7 @@ function AddSchedule({ onClose }: { onClose: () => void }) {
 
 function EventForm({ initial, kind, onClose }: { initial?: ClassEvent; kind?: EventKind; onClose: () => void }) {
   const { state, update, removeItem } = useStore();
+  const g = useGoogle();
   const isNew = !initial;
   const [draft, setDraft] = useState<ClassEvent>(() => initial ?? { id: newId(), kind: kind ?? '학급 행사', title: '', date: today() });
   const [error, setError] = useState('');
@@ -189,7 +191,7 @@ function EventForm({ initial, kind, onClose }: { initial?: ClassEvent; kind?: Ev
           <label className="field-label">메모 (선택)</label>
           <textarea rows={2} value={draft.memo ?? ''} onChange={(e) => set({ memo: e.target.value })} />
         </section>
-        {state.settings.calendarOn && <p className="hint">저장하면 구글 캘린더에도 들어가요.</p>}
+        {g.calendar && calendarWanted(state.settings) && <p className="hint">저장하면 구글 캘린더에도 들어가요.</p>}
         {error && <p className="error">{error}</p>}
         <footer className="form-actions">
           {!isNew && (

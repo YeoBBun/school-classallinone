@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { addDays, formatKo, formatStamp, today } from '../domain/calendar';
 import { stampLine, withWriteLog } from '../domain/student';
-import { NOTE_KINDS, PARENT_METHODS, type Note, type NoteKind } from '../domain/types';
+import { calendarWanted, NOTE_KINDS, PARENT_METHODS, type Note, type NoteKind } from '../domain/types';
+import { useGoogle } from '../google/useGoogle';
 import { newId, useStore } from '../store';
 import { Modal } from './common';
 import { StudentChips, toggleIn } from './ui';
@@ -32,6 +33,7 @@ export function NoteForm({
   onClose: () => void;
 }) {
   const { state, update, removeNote } = useStore();
+  const g = useGoogle();
   const isNew = !initial;
   const [draft, setDraft] = useState<Note>(
     () =>
@@ -151,7 +153,7 @@ export function NoteForm({
                 </div>
               </div>
             </section>
-            {planned && state.settings.calendarOn && <p className="hint">저장하면 구글 캘린더에도 들어가요.</p>}
+            {planned && g.calendar && calendarWanted(state.settings) && <p className="hint">저장하면 구글 캘린더에도 들어가요.</p>}
           </>
         )}
 

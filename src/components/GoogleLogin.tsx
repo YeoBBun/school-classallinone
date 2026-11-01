@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { hasCalendarScope, isNativeGoogle, signIn } from '../google/google';
+import { isNativeGoogle, signIn } from '../google/google';
 import { CALENDAR_NAME } from '../google/calendarSync';
 import { useGoogle } from '../google/useGoogle';
 import { useStore } from '../store';
@@ -15,7 +15,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
  */
 export function LoginDialog({ onClose }: { onClose: () => void }) {
   const g = useGoogle();
-  const { update, syncNow } = useStore();
+  const { syncNow } = useStore();
   const driveOn = () => {
     const cfg = loadSyncConfig();
     return !!cfg && !isGithub(cfg);
@@ -42,7 +42,6 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       await signIn();
-      if (hasCalendarScope()) update((s) => ({ ...s, settings: { ...s.settings, calendarOn: true } }));
       if (driveOn()) {
         syncNow();
         setStep('done');

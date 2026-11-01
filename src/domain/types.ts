@@ -252,10 +252,14 @@ export interface Settings extends Stamped {
   /** 행발 글자 한도 (나이스 바이트) */
   behaviorByteLimit: number;
   seating: SeatingRules;
-  /** 구글 캘린더에 상담 일정·제출 마감을 넣는가, 넣는 캘린더 */
+  /** 구글 캘린더에 일정·제출 마감을 넣는가: 기본은 넣는다 (구글에 로그인했을 때). 설정에서 끄면 false. calendarWanted() 로 읽는다 */
   calendarOn?: boolean;
+  /** 넣는 캘린더 */
   calendarId?: string;
 }
+
+/** 구글 캘린더에 넣을 것인가 — 끄지 않았으면 넣는다 */
+export const calendarWanted = (s: Settings): boolean => s.calendarOn !== false;
 
 export interface AppState {
   version: 6;
