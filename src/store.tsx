@@ -5,7 +5,7 @@ import { calendarWanted, type AppState } from './domain/types';
 import { androidApp } from './platform/android';
 import { loadState, requestPersistence, saveState } from './storage/db';
 import { widgetSummary } from './domain/widget';
-import { applyCalendar } from './google/calendarSync';
+import { applyCalendar, recheckCalendar } from './google/calendarSync';
 import { googleEmail, onGoogleChange } from './google/google';
 import { loadSyncConfig, pushPendingDrive, syncNow } from './sync/cloud';
 import { mergeStates, stamp } from './sync/merge';
@@ -33,6 +33,8 @@ interface Store {
   widgetSync: WidgetSyncStatus;
   /** 구글 캘린더에 일정을 맞춘 결과 */
   calendar: WidgetSyncStatus;
+  /** 캘린더가 있는지 다시 확인하고 지금 맞춘다 */
+  calendarNow: () => void;
 }
 
 export type WidgetSyncStatus = { kind: 'none' } | { kind: 'ok'; at: string } | { kind: 'error'; message: string };
@@ -163,7 +165,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // 다른 기기가 넣은 일정까지 받은 뒤에 캘린더를 맞춘다 (같은 일정을 두 번 넣지 않게)
       setTimeout(() => void runCalendar(), 300);
       // 휴대폰 위젯용 요약 — 실패해도 출결 동기화는 된 것이라 다음 동기화 때 다시 올린다
-      const summary = widgetSummary(merged, indexHolidays(merged.holidays), today());
+      const summary = widgetSummary(merged, indexHolidays(merged.holidays), today(), new Date().toISOString());
       pushPendingDrive(cfg, summary)
         .then(() => setWidgetSync({ kind: 'ok', at: new Date().toISOString() }))
         .catch((e) => setWidgetSync({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
@@ -180,6 +182,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // 구글에 (다시) 연결되면 바로 맞춘다
   useEffect(() => onGoogleChange(() => void runSync()), [runSync]);
+
+  // 휴대폰 앱이 화면에서 내려갈 때 부른다: 기다리지 않고 바로 올린다 (위젯이 곧 새로 받으므로)
+  useEffect(() => {
+    const w = window as unknown as { classAppFlush?: () => void };
+    w.classAppFlush = () => void runSync();
+    return () => {
+      delete w.classAppFlush;
+    };
+  }, [runSync]);
 
   // 이 기기에서 고치면 잠시 뒤 올린다
   useEffect(() => {
@@ -247,7 +258,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   if (!state) return <div className="fatal">불러오는 중…</div>;
 
   return (
-    <StoreContext.Provider value={{ state, update, replace, holidays, docContext, warnings, saveError, removeRecord, removeNote, removeItem, sync, syncNow: () => void runSync(), widgetSync, calendar }}>
+    <StoreContext.Provider
+      value={{
+        state,
+        update,
+        replace,
+        holidays,
+        docContext,
+        warnings,
+        saveError,
+        removeRecord,
+        removeNote,
+        removeItem,
+        sync,
+        syncNow: () => void runSync(),
+        widgetSync,
+        calendar,
+        calendarNow: () => {
+          recheckCalendar();
+          void runCalendar();
+        },
+      }}
+    >
       {children}
       {undo && (
         <div className="toast" role="status">

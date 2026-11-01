@@ -43,6 +43,9 @@ describe('위젯용 요약을 드라이브에', () => {
 
     await pushPendingDrive(cfg, summary);
     expect(drive.writes).toBe(1);
+    // 만든 시각만 다르면 같은 요약으로 본다
+    await pushPendingDrive(cfg, { ...summary, at: '2026-11-01T02:00:00.000Z' });
+    expect(drive.writes).toBe(1);
 
     // 비밀번호를 바꾸면(설정 저장) 다시 올린다 — 같은 파일을 덮어쓴다
     saveSyncConfig({ ...cfg, passphrase: '새비밀번호12' });

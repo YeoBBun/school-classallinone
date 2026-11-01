@@ -121,7 +121,7 @@ describe('오늘 챙길 일', () => {
       ],
     };
     const t = todoSummary(s, '2026-10-30');
-    expect(t.events.map((e) => e.id)).toEqual(['e1']);
+    expect(t.events.map((e) => e.id)).toEqual(['e1', 'e3']); // 지난 일만 빠지고 먼 일정도 보인다
     expect(t.upcoming.map((n) => n.id)).toEqual(['b']);
     expect(t.unwritten.map((n) => n.id)).toEqual(['a']);
     expect(t.followUps.map((n) => n.id)).toEqual(['c']);

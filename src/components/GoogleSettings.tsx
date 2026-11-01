@@ -9,9 +9,14 @@ import { LoginDialog } from './GoogleLogin';
 import { SyncLine } from './SyncSettings';
 
 /** 구글 연결: 로그인 하나로 캘린더(일정)·드라이브(자료, 기기 간 맞추기)·시트를 쓴다. 처음 로그인은 LoginDialog 가 맡는다 */
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 export function GoogleSettings() {
   const g = useGoogle();
-  const { state, update, sync, syncNow, calendar, widgetSync } = useStore();
+  const { state, update, sync, syncNow, calendar, calendarNow, widgetSync } = useStore();
   const driveOn = !!loadSyncConfig();
   const [dialog, setDialog] = useState(false);
   const [error, setError] = useState('');
@@ -108,7 +113,15 @@ export function GoogleSettings() {
             {calendarOn && !g.calendar && <p className="error">캘린더 권한이 없어요. 연결을 끊고 다시 로그인할 때 캘린더에 체크해 주세요.</p>}
             {calendarOn && calendar.kind === 'error' && <p className="error">캘린더에 넣지 못했어요: {calendar.message}</p>}
             {calendarOn && calendar.kind === 'ok' && (
-              <p className="sync-status done">✓ 일정 {state.calendarLinks.length}개가 캘린더에 들어가 있어요</p>
+              <p className="sync-status done">
+                ✓ {hhmm(calendar.at)} 맞춤 · 일정 {state.calendarLinks.length}개가 캘린더에 들어가 있어요
+              </p>
+            )}
+            {calendarOn && calendar.kind === 'none' && g.calendar && <p className="sync-status">아직 맞추지 않았어요.</p>}
+            {calendarOn && g.calendar && (
+              <button className="ghost small" onClick={calendarNow}>
+                지금 다시 맞추기
+              </button>
             )}
             <p className="hint">캘린더에는 학생 이름과 일시만 들어가고, 상담 내용은 들어가지 않아요.</p>
           </div>

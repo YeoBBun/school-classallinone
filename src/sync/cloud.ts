@@ -125,7 +125,8 @@ const DRIVE_PENDING = 'class-pending.json';
  * (다른 기기가 먼저 올렸어도 덮어쓸 뿐이라 해가 없다)
  */
 export async function pushPendingDrive(cfg: GoogleSyncConfig, summary: unknown): Promise<void> {
-  const sent = `drive\n${JSON.stringify(summary)}`;
+  const { at: _at, ...content } = summary as { at?: string };
+  const sent = `drive\n${JSON.stringify(content)}`;
   try {
     if (localStorage.getItem(PENDING_SENT_KEY) === sent) return;
   } catch {

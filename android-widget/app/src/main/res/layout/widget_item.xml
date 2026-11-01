@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 위젯 한 줄: [D-day 알약] 제목 내용 / 둘째 줄 자세히. 알약은 PendingListService 가 상태별 배경을 고른다 -->
+<!-- 위젯 한 줄: [D-day 알약] 제목 내용 / 둘째 줄 자세히. 알약은 WidgetList 가 상태별 배경을 고른다 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/row"
     android:layout_width="match_parent"

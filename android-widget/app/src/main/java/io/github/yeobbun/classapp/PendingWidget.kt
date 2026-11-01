@@ -6,9 +6,10 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.text.format.DateFormat
 import android.widget.RemoteViews
+import androidx.core.widget.RemoteViewsCompat
+import java.time.Instant
 import java.time.LocalDate
 
 /** 홈 화면 위젯: 처리 예정 (출결 서류·일정·제출물·할 일·필사) */
@@ -43,14 +44,18 @@ class PendingWidget : AppWidgetProvider() {
             val ids = mgr.getAppWidgetIds(ComponentName(ctx, PendingWidget::class.java))
             if (ids.isEmpty()) return
             render(ctx, mgr, ids, checking)
-            @Suppress("DEPRECATION")
-            mgr.notifyAppWidgetViewDataChanged(ids, R.id.list)
         }
+
+        /** 요약을 만든 시각 → "10:58 요약 · " (모르면 빈 칸) */
+        private fun made(at: String?): String =
+            at?.let { runCatching { DateFormat.format("H:mm", Instant.parse(it).toEpochMilli()).toString() + " 요약 · " }.getOrNull() } ?: ""
 
         private fun render(ctx: Context, mgr: AppWidgetManager, ids: IntArray, checking: Boolean = false) {
             val p = Prefs(ctx)
             val summary = p.summary()
-            val count = summary?.visible(LocalDate.now().toString())?.sumOf { it.rows.size }
+            val today = LocalDate.now().toString()
+            val sections = summary?.visible(today) ?: emptyList()
+            val count = summary?.let { sections.sumOf { it.rows.size } }
 
             val openApp = PendingIntent.getActivity(
                 ctx, 0, Intent(ctx, WebAppActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
@@ -70,7 +75,8 @@ class PendingWidget : AppWidgetProvider() {
                 checking -> "확인 중…"
                 !p.configured -> "구글 로그인 필요"
                 p.error != null -> "⚠ ${p.error}"
-                p.checkedAt > 0 -> DateFormat.format("H:mm", p.checkedAt).toString() + " 확인"
+                // 예: 10:58 요약 · 11:02 확인 — 요약이 최신인지(학급관리에서 고친 뒤인지) 알 수 있게
+                p.checkedAt > 0 -> made(summary?.at) + DateFormat.format("H:mm", p.checkedAt).toString() + " 확인"
                 else -> ""
             }
             val empty = when {
@@ -89,11 +95,7 @@ class PendingWidget : AppWidgetProvider() {
                 v.setOnClickPendingIntent(R.id.refresh, refresh)
                 v.setOnClickPendingIntent(R.id.empty, openApp)
 
-                val svc = Intent(ctx, PendingListService::class.java)
-                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                svc.data = Uri.parse(svc.toUri(Intent.URI_INTENT_SCHEME))
-                @Suppress("DEPRECATION")
-                v.setRemoteAdapter(R.id.list, svc)
+                RemoteViewsCompat.setRemoteAdapter(ctx, v, id, R.id.list, WidgetList.items(ctx, sections, today))
                 v.setEmptyView(R.id.list, R.id.empty)
                 v.setPendingIntentTemplate(R.id.list, itemTemplate)
                 mgr.updateAppWidget(id, v)

@@ -65,7 +65,13 @@ data class PlanRow(
 /** link: 누르면 열 학급관리 화면 (예: #checklists). 예전 요약에는 없다 */
 data class PlanSection(val title: String, val rows: List<PlanRow>, val link: String = "")
 
-data class PendingSummary(val className: String, val items: List<PendingItem>, val sections: List<PlanSection> = emptyList()) {
+/** at: 학급관리가 이 요약을 만든 시각 (ISO). 예전 요약에는 없다 */
+data class PendingSummary(
+    val className: String,
+    val items: List<PendingItem>,
+    val sections: List<PlanSection> = emptyList(),
+    val at: String? = null,
+) {
     /** 기한 지난 것을 위로 (나머지는 출결 날짜순 그대로) */
     fun sorted(today: String): List<PendingItem> = items.sortedBy { if (it.overdue(today)) 0 else 1 }
 
@@ -133,7 +139,7 @@ object Pending {
                 )
             }
         } ?: listOf(PlanSection("출결 서류", items.map { PlanRow(it.who, it.doc, it.what, due = it.deadline, tripEnd = it.tripEnd) }))
-        return PendingSummary(o.optString("className"), items, sections)
+        return PendingSummary(o.optString("className"), items, sections, o.optString("at").ifEmpty { null })
     }
 
     /** 남은 날: 오늘 D-0, 사흘 뒤 D-3, 지났으면 D+2 */

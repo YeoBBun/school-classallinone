@@ -2,7 +2,6 @@
  * 학급 운영 모듈의 계산: 제출물, 필사, 행발 글자 수, 오늘 챙길 일.
  * 화면과 떨어뜨려 두고 테스트한다.
  */
-import { addDays } from './calendar';
 import type { AppState, Checklist, ClassEvent, DateStr, Note, PilsaTask, Settings, Student } from './types';
 
 // ─── 제출물 ───
@@ -106,9 +105,9 @@ export function newSchoolYear(s: AppState): AppState {
 // ─── 오늘 챙길 일 ───
 
 export interface TodoSummary {
-  /** 앞으로 14일 안의 상담 일정 (가까운 순) */
+  /** 앞으로 있는 상담 일정 (가까운 순) */
   upcoming: Note[];
-  /** 앞으로 14일 안의 학급 일정 (가까운 순) */
+  /** 앞으로 있는 학급 일정 (가까운 순) */
   events: ClassEvent[];
   /** 날짜가 지났는데 결과를 안 적은 상담 */
   unwritten: Note[];
@@ -122,7 +121,6 @@ export interface TodoSummary {
 }
 
 export function todoSummary(s: AppState, today: DateStr): TodoSummary {
-  const soon = addDays(today, 14);
   const planned = s.notes.filter((n) => n.planned);
   const byWhen = (a: Note, b: Note) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''));
   const checklists = s.checklists
@@ -136,8 +134,8 @@ export function todoSummary(s: AppState, today: DateStr): TodoSummary {
     if (left > 0) remaining.set(p.studentId, (remaining.get(p.studentId) ?? 0) + left);
   }
   return {
-    upcoming: planned.filter((n) => n.date >= today && n.date <= soon).sort(byWhen),
-    events: s.events.filter((e) => e.date >= today && e.date <= soon).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))),
+    upcoming: planned.filter((n) => n.date >= today).sort(byWhen),
+    events: s.events.filter((e) => e.date >= today).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))),
     unwritten: planned.filter((n) => n.date < today).sort(byWhen),
     followUps: s.notes.filter((n) => n.followUp?.trim() && !n.followUpDone).sort((a, b) => a.date.localeCompare(b.date)),
     checklists,

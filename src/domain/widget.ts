@@ -43,6 +43,8 @@ export interface WidgetSummary {
   items: WidgetItem[];
   /** link: 위젯에서 그 묶음을 누르면 열 화면 */
   sections: { title: string; link: string; rows: WidgetRow[] }[];
+  /** 요약을 만든 시각 (ISO) — 위젯에 '10:58 요약' 으로 보여 최신인지 알 수 있게 */
+  at?: string;
 }
 
 /** 위젯 묶음을 누르면 열 학급관리 화면. 받음·결과 적기·체크는 오늘 화면에서 한다 */
@@ -56,10 +58,10 @@ const SECTION_LINK: Record<PlanSectionTitle, string> = {
 };
 
 /**
- * 위젯에 보여줄 요약. 일정은 앞으로 14일 것이 담기고, 날짜에 따라 바뀌는 것(D-day, 기한 지남, 지난 일정)은
+ * 위젯에 보여줄 요약. 일정은 앞으로 있는 것이 다 담기고, 날짜에 따라 바뀌는 것(D-day, 기한 지남, 지난 일정)은
  * 위젯이 계산하므로 앱을 며칠 안 열어도 위젯이 틀리지 않는다.
  */
-export function widgetSummary(state: AppState, holidays: HolidayIndex, today: DateStr): WidgetSummary {
+export function widgetSummary(state: AppState, holidays: HolidayIndex, today: DateStr, madeAt?: string): WidgetSummary {
   const who = (n: Note) => n.studentIds.map((id) => state.students.find((s) => s.id === id)?.name ?? '?').join(', ');
   const at = (d: DateStr, time?: string) => (time ? `${formatKo(d)} ${time}` : formatKo(d));
   const row = (r: PlanRow): WidgetRow => {
@@ -103,5 +105,6 @@ export function widgetSummary(state: AppState, holidays: HolidayIndex, today: Da
       ...(doc.key === DOC_FT_REPORT ? { tripEnd: record.endDate } : {}),
     })),
     sections: planSections(state, holidays, today).map((s) => ({ title: s.title, link: SECTION_LINK[s.title], rows: s.rows.map(row) })),
+    ...(madeAt ? { at: madeAt } : {}),
   };
 }

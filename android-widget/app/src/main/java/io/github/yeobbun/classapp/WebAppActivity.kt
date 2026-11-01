@@ -92,8 +92,9 @@ class WebAppActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        // 서류를 '받음' 으로 바꿨으면 학급관리가 요약을 올린 뒤(고친 뒤 4초 + 올리기) 위젯도 새로 받는다
-        Refresh.later(this, 20)
+        // 고친 것을 기다리지 않고 바로 올리게 하고(화면이 내려가면 웹이 멈출 수 있어서), 올린 뒤 위젯도 새로 받는다
+        web.evaluateJavascript("window.classAppFlush && window.classAppFlush()", null)
+        Refresh.later(this, 15)
     }
 
     @Deprecated("Deprecated in Java")

@@ -45,11 +45,6 @@
                 android:resource="@xml/pending_widget_info" />
         </receiver>
 
-        <service
-            android:name=".PendingListService"
-            android:exported="false"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
-
         <!-- 나이스 파일을 공유 창으로 보낼 때 -->
         <provider
             android:name="androidx.core.content.FileProvider"

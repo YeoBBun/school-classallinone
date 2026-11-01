@@ -14,8 +14,15 @@ import * as google from './google';
 
 export const CALENDAR_NAME = '학급관리';
 
-/** 이번에 켠 동안 있는 것을 확인한 캘린더 (매번 묻지 않는다) */
-const checked = new Set<string>();
+/** 있는 것을 확인한 캘린더와 그 시각 — 10분이 지나면 다시 묻는다 (켜 둔 동안 지웠을 수 있다) */
+const checked = new Map<string, number>();
+const RECHECK_MS = 10 * 60_000;
+const isChecked = (id: string) => (checked.get(id) ?? 0) > Date.now() - RECHECK_MS;
+
+/** 다음에 맞출 때 캘린더가 있는지 다시 묻게 한다 ([지금 다시 맞추기]) */
+export function recheckCalendar(): void {
+  checked.clear();
+}
 /** 이번에 켠 동안 이미 지운 캘린더 */
 const deleted = new Set<string>();
 
@@ -32,7 +39,7 @@ export async function applyCalendar(s: AppState): Promise<CalendarResult | null>
   let calendarId = s.settings.calendarId ?? '';
   const retired = new Set(s.settings.calendarRetired ?? []);
   let links = s.calendarLinks;
-  if (!calendarId || !checked.has(calendarId)) {
+  if (!calendarId || !isChecked(calendarId)) {
     const found = (await google.findCalendars(CALENDAR_NAME)) ?? [];
     const alive = !!calendarId && !retired.has(calendarId) && (found.includes(calendarId) || (await google.calendarExists(calendarId)));
     if (!alive) {
@@ -49,7 +56,7 @@ export async function applyCalendar(s: AppState): Promise<CalendarResult | null>
       deleted.add(id);
     }
   }
-  checked.add(calendarId);
+  checked.set(calendarId, Date.now());
   // 다른 캘린더에 넣었던 일정은 없는 것으로 (새 캘린더에 다시 넣는다). 예전 기록(cal 없음)은 지금 캘린더 것으로 본다
   links = links.filter((l) => (l.cal ?? calendarId) === calendarId);
   const retiredList = [...retired].filter((id) => id !== calendarId).sort();

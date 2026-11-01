@@ -48,7 +48,7 @@ class PendingTest {
     @Test
     fun `묶음별 요약 - 남은 날, 지난 일정 감추기, 기한 지난 것 위로`() {
         val plain = """
-            {"format":"attendance-app/pending-v1","className":"2-3","items":[],"sections":[
+            {"format":"attendance-app/pending-v1","className":"2-3","items":[],"at":"2026-10-30T01:58:00.000Z","sections":[
               {"title":"일정","link":"#schedule","rows":[
                 {"title":"김하늘","text":"학부모 상담","detail":"10/30(금) 15:00","on":"2026-10-30"},
                 {"title":"체육대회","text":"학급 행사","detail":"11/2(월)","on":"2026-11-02"}]},
@@ -58,6 +58,7 @@ class PendingTest {
               {"title":"필사","rows":[{"title":"1. 김하늘","text":"3장 남음","detail":"10/20(화) 휴대폰 사용"}]}]}
         """.trimIndent()
         val s = Pending.parse(plain)
+        assertEquals("2026-10-30T01:58:00.000Z", s.at)
         assertEquals("#schedule", s.sections[0].link)
         assertEquals("", s.sections[1].link)
         assertEquals(listOf("D-0", "D-3"), s.sections[0].rows.map { it.dday("2026-10-30") })

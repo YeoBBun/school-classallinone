@@ -51,6 +51,8 @@ android {
 dependencies {
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
+    // 위젯 목록을 갱신 때 통째로 넘긴다 (옛 안드로이드에서도)
+    implementation("androidx.core:core-remoteviews:1.0.0")
     // 휴대폰의 구글 로그인 (드라이브·캘린더 권한)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     testImplementation("junit:junit:4.13.2")

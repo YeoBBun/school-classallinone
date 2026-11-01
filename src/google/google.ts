@@ -524,7 +524,7 @@ export async function calendarExists(id: string): Promise<boolean> {
     await api(`${CAL}/calendars/${encodeURIComponent(id)}`);
     return true;
   } catch (e) {
-    if (e instanceof GoogleError && (e.status === 404 || e.status === 403)) return false;
+    if (e instanceof GoogleError && (e.status === 404 || e.status === 403 || e.status === 410)) return false;
     throw e;
   }
 }
