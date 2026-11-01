@@ -1,23 +1,16 @@
 /**
- * 기기 간 동기화 (구글 드라이브 또는 깃허브 비공개 저장소 경유)
+ * 기기 간 동기화 (구글 드라이브 경유)
  *
  * 앱 데이터 전체를 선생님이 정한 잠금 비밀번호로 잠가(gzip → PBKDF2-SHA256 → AES-256-GCM)
- * 파일 하나에 둔다 (드라이브: 내 드라이브 '학급관리' 폴더의 class-state.json, 깃허브: sync/state.json).
+ * 내 드라이브 '학급관리' 폴더의 class-state.json 하나에 둔다.
  * 각 기기는 받아서 합치고(merge.ts), 달라졌으면 다시 올린다.
- * 연동 설정(토큰·비밀번호)은 이 기기에만 저장하고 백업 파일에는 넣지 않는다.
+ * 잠금 비밀번호는 이 기기에만 저장하고 백업 파일에는 넣지 않는다.
+ * (예전 출결관리의 깃허브로 맞추기는 학급관리에서 뺐다 — 구글 로그인 하나로 맞추기·캘린더·자료·위젯을 다 한다)
  */
 import type { AppState } from '../domain/types';
 import * as google from '../google/google';
 import { normalize } from '../storage/db';
 import { canonical, mergeStates } from './merge';
-
-export interface GithubSyncConfig {
-  kind?: 'github';
-  /** 예: YeoBBun/school-attendance-sync */
-  repo: string;
-  token: string;
-  passphrase: string;
-}
 
 /** 구글 드라이브: 로그인은 google.ts 가 맡고, 여기에는 잠금 비밀번호만 */
 export interface GoogleSyncConfig {
@@ -25,41 +18,25 @@ export interface GoogleSyncConfig {
   passphrase: string;
 }
 
-export type SyncConfig = GithubSyncConfig | GoogleSyncConfig;
-
-export const isGithub = (cfg: SyncConfig): cfg is GithubSyncConfig => cfg.kind !== 'google';
+export type SyncConfig = GoogleSyncConfig;
 
 const DRIVE_FILE = 'class-state.json';
 
 // 출결관리 앱과 같은 주소 아래라 이름을 따로 쓴다 (출결관리의 동기화 설정을 덮어쓰거나 가져오지 않게)
 const CONFIG_KEY = 'class-sync-config';
-const STATE_PATH = 'sync/state.json';
-/** 휴대폰 위젯이 읽는 처리 예정 요약 (같은 비밀번호로 잠근다) */
-const PENDING_PATH = 'sync/pending.json';
 /** 이 기기가 마지막으로 올린 요약 — 그대로면 다시 올리지 않는다 */
 const PENDING_SENT_KEY = 'class-widget-pending-sent';
 const ENC_FORMAT = 'attendance-app/state-enc-v1';
 const PBKDF2_ITER = 210_000;
-
-let API = (() => {
-  try {
-    return localStorage.getItem('class-sync-api') ?? 'https://api.github.com'; // 시험용으로만 바꾼다
-  } catch {
-    return 'https://api.github.com';
-  }
-})();
-
-/** 시험용 */
-export function setApiBase(url: string) {
-  API = url;
-}
 
 // ─── 이 기기에만 저장 ─────────────────────────────────────
 
 export function loadSyncConfig(): SyncConfig | null {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
-    return raw ? (JSON.parse(raw) as SyncConfig) : null;
+    const cfg = raw ? (JSON.parse(raw) as { kind?: string; passphrase?: string }) : null;
+    // 예전에 깃허브로 맞추던 설정은 쓰지 않는다 (구글로 다시 연결)
+    return cfg?.kind === 'google' && cfg.passphrase ? { kind: 'google', passphrase: cfg.passphrase } : null;
   } catch {
     return null;
   }
@@ -127,72 +104,7 @@ export async function decrypt(env: Envelope, passphrase: string): Promise<unknow
   return JSON.parse(new TextDecoder().decode(await gzip(new Uint8Array(plain), 'gunzip')));
 }
 
-// ─── 깃허브 ──────────────────────────────────────────────
-
-async function gh(cfg: GithubSyncConfig, method: string, path: string, body?: unknown): Promise<Response> {
-  return fetch(`${API}/repos/${cfg.repo}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${cfg.token}`,
-      Accept: 'application/vnd.github+json',
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    cache: 'no-store',
-  });
-}
-
-/** 연결 확인. 문제가 없으면 null, 있으면 선생님께 보여줄 문장. */
-export async function testConnection(cfg: GithubSyncConfig): Promise<string | null> {
-  try {
-    const r = await gh(cfg, 'GET', '');
-    if (r.status === 200) {
-      const repo = (await r.json()) as { private?: boolean; permissions?: { push?: boolean } };
-      if (!repo.private) return '저장소가 공개(Public)로 되어 있어요. 깃허브에서 Private 으로 바꿔 주세요.';
-      if (repo.permissions && !repo.permissions.push) return '토큰에 쓰기 권한이 없어요. Contents 를 Read and write 로 만들어 주세요.';
-      return null;
-    }
-    if (r.status === 401) return '토큰이 맞지 않거나 만료됐어요.';
-    if (r.status === 404) return '저장소를 찾지 못했어요. 이름과 토큰의 저장소 선택을 확인해 주세요.';
-    return `깃허브 응답 오류 (${r.status})`;
-  } catch {
-    return '인터넷에 연결되지 않았거나 이 네트워크에서 깃허브가 막혀 있어요.';
-  }
-}
-
 export class SyncError extends Error {}
-
-async function pullGithub(cfg: GithubSyncConfig): Promise<Remote | null> {
-  const r = await gh(cfg, 'GET', `/contents/${STATE_PATH}`);
-  if (r.status === 404) return null;
-  if (r.status === 401) throw new SyncError('토큰이 맞지 않거나 만료됐어요.');
-  if (!r.ok) throw new SyncError(`받아오지 못했어요 (깃허브 ${r.status})`);
-  const data = (await r.json()) as { content?: string; sha: string; download_url?: string };
-  // 1MB 넘는 파일은 content 가 비어 온다 → 원본 그대로 다시 받는다
-  const text = data.content
-    ? new TextDecoder().decode(fromB64(data.content))
-    : await (await fetch(`${API}/repos/${cfg.repo}/contents/${STATE_PATH}`, {
-        headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github.raw+json' },
-        cache: 'no-store',
-      })).text();
-  let plain: unknown;
-  try {
-    plain = await decrypt(JSON.parse(text) as Envelope, cfg.passphrase);
-  } catch {
-    throw new SyncError('잠금 비밀번호가 다른 기기와 달라요.');
-  }
-  return { state: normalize(plain), sha: data.sha };
-}
-
-async function pushGithub(cfg: GithubSyncConfig, state: AppState, sha?: string): Promise<'ok' | 'conflict'> {
-  const body = { message: '동기화', content: btoa(JSON.stringify(await encrypt(state, cfg.passphrase))), ...(sha ? { sha } : {}) };
-  const r = await gh(cfg, 'PUT', `/contents/${STATE_PATH}`, body);
-  if (r.ok) return 'ok';
-  if (r.status === 409 || r.status === 422) return 'conflict'; // 그 사이 다른 기기가 올렸다
-  if (r.status === 401) throw new SyncError('토큰이 맞지 않거나 만료됐어요.');
-  if (r.status === 403) throw new SyncError('올리기가 막혔어요 (토큰 권한 또는 학교망 차단).');
-  throw new SyncError(`올리지 못했어요 (깃허브 ${r.status})`);
-}
 
 // ─── 구글 드라이브 ───────────────────────────────────────
 
@@ -292,14 +204,13 @@ async function pushDrive(cfg: GoogleSyncConfig, state: AppState, remote: Remote 
 
 interface Remote {
   state: AppState;
-  /** 깃허브 sha 또는 드라이브 version */
+  /** 드라이브 파일 version */
   sha: string;
   fileId?: string;
 }
 
-const pull = (cfg: SyncConfig) => (isGithub(cfg) ? pullGithub(cfg) : pullDrive(cfg));
-const push = (cfg: SyncConfig, state: AppState, remote: Remote | null) =>
-  isGithub(cfg) ? pushGithub(cfg, state, remote?.sha) : pushDrive(cfg, state, remote);
+const pull = (cfg: SyncConfig) => pullDrive(cfg);
+const push = (cfg: SyncConfig, state: AppState, remote: Remote | null) => pushDrive(cfg, state, remote);
 
 /**
  * 받아서 합치고, 달라졌으면 올린다. 합친 상태를 돌려준다 (로컬과 같으면 같은 객체).
@@ -315,34 +226,4 @@ export async function syncNow(cfg: SyncConfig, local: AppState): Promise<AppStat
     if ((await push(cfg, merged, remote)) === 'ok') return canonical(merged) === canonical(local) ? local : merged;
   }
   throw new SyncError('다른 기기와 동시에 고치는 중이에요. 잠시 뒤 다시 맞춥니다.');
-}
-
-/**
- * 휴대폰 위젯용 처리 예정 요약을 올린다. 이 기기가 지난번에 올린 것과 같으면 건너뛴다.
- * 다른 기기가 같은 내용을 먼저 올렸어도 덮어쓸 뿐이라 해가 없다.
- */
-export async function pushPending(cfg: GithubSyncConfig, summary: unknown): Promise<void> {
-  const text = JSON.stringify(summary);
-  const sent = `${cfg.repo}\n${text}`;
-  try {
-    if (localStorage.getItem(PENDING_SENT_KEY) === sent) return;
-  } catch {
-    /* 저장 공간을 못 쓰면 매번 올린다 */
-  }
-  const content = btoa(JSON.stringify(await encrypt(summary, cfg.passphrase)));
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const cur = await gh(cfg, 'GET', `/contents/${PENDING_PATH}`);
-    if (!cur.ok && cur.status !== 404) throw new SyncError(`위젯 요약을 확인하지 못했어요 (깃허브 ${cur.status})`);
-    const sha = cur.ok ? ((await cur.json()) as { sha: string }).sha : undefined;
-    const r = await gh(cfg, 'PUT', `/contents/${PENDING_PATH}`, { message: '위젯 요약', content, ...(sha ? { sha } : {}) });
-    if (r.ok) {
-      try {
-        localStorage.setItem(PENDING_SENT_KEY, sent);
-      } catch {
-        /* 다음에 다시 올린다 */
-      }
-      return;
-    }
-    if (r.status !== 409 && r.status !== 422) throw new SyncError(`위젯 요약을 올리지 못했어요 (깃허브 ${r.status})`);
-  }
 }

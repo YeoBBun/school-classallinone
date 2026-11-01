@@ -4,7 +4,7 @@ import { CALENDAR_NAME } from '../google/calendarSync';
 import { useGoogle } from '../google/useGoogle';
 import { calendarWanted } from '../domain/types';
 import { useStore } from '../store';
-import { isGithub, loadSyncConfig, saveSyncConfig } from '../sync/cloud';
+import { loadSyncConfig, saveSyncConfig } from '../sync/cloud';
 import { LoginDialog } from './GoogleLogin';
 import { SyncLine } from './SyncSettings';
 
@@ -12,8 +12,7 @@ import { SyncLine } from './SyncSettings';
 export function GoogleSettings() {
   const g = useGoogle();
   const { state, update, sync, syncNow, calendar, widgetSync } = useStore();
-  const cfg = loadSyncConfig();
-  const driveOn = !!cfg && !isGithub(cfg);
+  const driveOn = !!loadSyncConfig();
   const [dialog, setDialog] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);

@@ -4,7 +4,7 @@ import { isNativeGoogle, signIn } from '../google/google';
 import { CALENDAR_NAME } from '../google/calendarSync';
 import { useGoogle } from '../google/useGoogle';
 import { useStore } from '../store';
-import { driveHasState, drivePassphraseOk, isGithub, loadSyncConfig, saveSyncConfig } from '../sync/cloud';
+import { driveHasState, drivePassphraseOk, loadSyncConfig, saveSyncConfig } from '../sync/cloud';
 import { Modal } from './common';
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -16,10 +16,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export function LoginDialog({ onClose }: { onClose: () => void }) {
   const g = useGoogle();
   const { syncNow } = useStore();
-  const driveOn = () => {
-    const cfg = loadSyncConfig();
-    return !!cfg && !isGithub(cfg);
-  };
+  const driveOn = () => !!loadSyncConfig();
   const [step, setStep] = useState<'login' | 'lock' | 'done'>(() => (!g.connected ? 'login' : driveOn() ? 'done' : 'lock'));
   /** 드라이브에 다른 기기가 올린 데이터가 있는가 (모르면 null) */
   const [existing, setExisting] = useState<boolean | null>(null);
@@ -27,10 +24,6 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
   const [pass2, setPass2] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const github = (() => {
-    const cfg = loadSyncConfig();
-    return !!cfg && isGithub(cfg);
-  })();
 
   useEffect(() => {
     if (step !== 'lock' || existing !== null) return;
@@ -127,7 +120,6 @@ export function LoginDialog({ onClose }: { onClose: () => void }) {
                 </div>
               </>
             )}
-            {github && existing !== null && <p className="hint">지금은 깃허브로 맞추고 있어요. 시작하면 구글 드라이브로 바꿔 맞춰요.</p>}
             <footer className="form-actions">
               <button type="button" onClick={() => setStep('done')}>
                 나중에

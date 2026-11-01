@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import { GoogleSettings } from './GoogleSettings';
-import { SyncSettings } from './SyncSettings';
 import { formatKo, indexHolidays } from '../domain/calendar';
 import { rebuildDocs } from '../domain/rules';
 import { mergePublicHolidays } from '../domain/publicHolidays';
@@ -87,10 +86,7 @@ export function SettingsView({ section }: { section: string | null }) {
         </>
       )}
       {open.id === 'google' && (
-        <>
-          <GoogleSettings />
-          <SyncSettings />
-        </>
+        <GoogleSettings />
       )}
       {open.id === 'rules' && (
         <>

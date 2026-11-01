@@ -7,7 +7,7 @@ import { loadState, requestPersistence, saveState } from './storage/db';
 import { widgetSummary } from './domain/widget';
 import { applyCalendar } from './google/calendarSync';
 import { googleEmail, onGoogleChange } from './google/google';
-import { isGithub, loadSyncConfig, pushPending, pushPendingDrive, syncNow } from './sync/cloud';
+import { loadSyncConfig, pushPendingDrive, syncNow } from './sync/cloud';
 import { mergeStates, stamp } from './sync/merge';
 
 interface Store {
@@ -136,7 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const runSync = useCallback(async () => {
     const cfg = loadSyncConfig();
     // 휴대폰 '학급관리' 앱 안이면 위젯도 같은 설정(구글 계정·잠금 비밀번호)을 쓰게 넘긴다 (바뀌었을 때만 앱이 반영)
-    androidApp()?.setSyncConfig?.(cfg ? JSON.stringify(isGithub(cfg) ? cfg : { ...cfg, email: googleEmail() }) : '');
+    androidApp()?.setSyncConfig?.(cfg ? JSON.stringify({ ...cfg, email: googleEmail() }) : '');
     if (!cfg) {
       setSync({ kind: 'off' });
       return runCalendar();
@@ -161,7 +161,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTimeout(() => void runCalendar(), 300);
       // 휴대폰 위젯용 요약 — 실패해도 출결 동기화는 된 것이라 다음 동기화 때 다시 올린다
       const summary = widgetSummary(merged, indexHolidays(merged.holidays), today());
-      (isGithub(cfg) ? pushPending(cfg, summary) : pushPendingDrive(cfg, summary))
+      pushPendingDrive(cfg, summary)
         .then(() => setWidgetSync({ kind: 'ok', at: new Date().toISOString() }))
         .catch((e) => setWidgetSync({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
     } catch (e) {
