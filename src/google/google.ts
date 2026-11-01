@@ -477,6 +477,47 @@ export async function createCalendar(summary: string): Promise<string> {
   return ((await r.json()) as { id: string }).id;
 }
 
+/**
+ * 이 앱이 만든, 이름이 summary 인 캘린더들 (id 순). calendar.app.created 권한으로는 앱이 만든 캘린더만 보인다.
+ * 목록을 볼 수 없는 환경이면 null.
+ */
+export async function findCalendars(summary: string): Promise<string[] | null> {
+  try {
+    const r = await api(`${CAL}/users/me/calendarList?minAccessRole=owner&showHidden=true&fields=items(id,summary)`);
+    const items = ((await r.json()) as { items?: { id: string; summary?: string }[] }).items ?? [];
+    return items
+      .filter((c) => c.summary === summary)
+      .map((c) => c.id)
+      .sort();
+  } catch (e) {
+    if (e instanceof GoogleError && (e.status === 403 || e.status === 404)) return null;
+    throw e;
+  }
+}
+
+/** 이 앱이 만든 캘린더 지우기 (이미 없으면 그만) */
+export async function deleteCalendar(id: string): Promise<void> {
+  try {
+    await api(`${CAL}/calendars/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch (e) {
+    if (!(e instanceof GoogleError && (e.status === 404 || e.status === 410))) throw e;
+  }
+}
+
+/** 캘린더 안 일정을 모두 지운다 (앱이 넣은 사본뿐이라 다시 넣으면 된다) */
+export async function clearEvents(calendarId: string): Promise<void> {
+  const base = `${CAL}/calendars/${encodeURIComponent(calendarId)}/events`;
+  let page = '';
+  const ids: string[] = [];
+  do {
+    const r = await api(`${base}?maxResults=2500&fields=nextPageToken,items(id)${page ? `&pageToken=${page}` : ''}`);
+    const j = (await r.json()) as { items?: { id: string }[]; nextPageToken?: string };
+    ids.push(...(j.items ?? []).map((x) => x.id));
+    page = j.nextPageToken ?? '';
+  } while (page);
+  for (const id of ids) await deleteEvent(calendarId, id);
+}
+
 /** 캘린더가 아직 있는가 (지웠으면 다시 만든다) */
 export async function calendarExists(id: string): Promise<boolean> {
   try {
